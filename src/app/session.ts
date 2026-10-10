@@ -509,7 +509,8 @@ export class Session {
     const tm = performance.now();
     queueMicrotask(() => perfLog('regroup', performance.now() - tm));
     const photos = state.photos;
-    const sorted = [...photos].sort((a, b) => (a.captureTime ?? 0) - (b.captureTime ?? 0));
+    // Unreadable files have no pixels to compare: keep them out of burst groups.
+    const sorted = photos.filter((p) => p.thumbState !== 'error').sort((a, b) => (a.captureTime ?? 0) - (b.captureTime ?? 0));
     const items = sorted.map((p) => ({ id: p.id, captureTime: p.captureTime, hash: p.phash ? BigInt('0x' + p.phash) : undefined }));
     let groups: number[];
     try {

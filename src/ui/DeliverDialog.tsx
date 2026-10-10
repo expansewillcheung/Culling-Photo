@@ -86,7 +86,7 @@ export default function DeliverDialog() {
       setProgress(null);
       await appActions.reopen();
       setResult(
-        `完成：移动 ${st.moved}，复制 ${st.copied}，XMP ${st.xmp}${st.failed ? `，失败 ${st.failed}` : ''}${st.nativeMoves < st.moved ? '（部分使用复制+删除）' : ''}。`,
+        `完成：移动 ${st.moved} 个文件，复制 ${st.copied} 个（均含 sidecar），写入 XMP ${st.xmp} 个${st.failed ? `，失败 ${st.failed}` : ''}${st.nativeMoves < st.moved ? '（部分使用复制+删除）' : ''}。`,
       );
       actions.toast(`交付完成。在 Photomator 中打开「${opts().picksDir ?? '_Picks'}」文件夹即可。`, 5000);
     } catch (e) {
@@ -131,7 +131,14 @@ export default function DeliverDialog() {
               当前是只读模式，不能移动文件或写入 sidecar。可以导出评分，再把 XMP 文件复制到照片文件夹，或者用 Chrome / Edge 以「打开文件夹」方式重新打开。
             </p>
             <div class="foot" style={{ 'justify-content': 'flex-start' }}>
-              <button onClick={() => download(exportXmpZip(state.photos.map(toDelivery)), `${state.sourceName}-xmp.zip`)}>下载 XMP 压缩包</button>
+              <button
+                onClick={() => {
+                  if (!state.photos.some((p) => p.rating || p.flag || p.label)) return actions.toast('还没有任何标记，没有可导出的 XMP');
+                  download(exportXmpZip(state.photos.map(toDelivery)), `${state.sourceName}-xmp.zip`);
+                }}
+              >
+                下载 XMP 压缩包
+              </button>
               <button onClick={() => download(new Blob([exportCsv(state.photos.map(toDelivery))], { type: 'text/csv' }), `${state.sourceName}-marks.csv`)}>
                 下载 CSV
               </button>
@@ -199,7 +206,7 @@ export default function DeliverDialog() {
           <span class="count">星级、色标、旗标随照片一起移动</span>
         </div>
         <div class="summary" data-testid="deliver-summary">
-          将交付 <b>{plan().summary.picks}</b> 张保留、<b>{plan().summary.rejects}</b> 张淘汰，共 <b>{plan().summary.files}</b> 个文件操作，
+          将交付 <b>{plan().summary.picks}</b> 张保留、<b>{plan().summary.rejects}</b> 张淘汰，共 <b>{plan().summary.files}</b> 个文件（不含 sidecar），
           <b>{plan().summary.xmp}</b> 个 XMP。所有操作都记录在 _culling-log.json 中，可以还原。
         </div>
         <Show when={progress()}>

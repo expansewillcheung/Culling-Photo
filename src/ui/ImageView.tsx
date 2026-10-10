@@ -210,7 +210,8 @@ export function ImageView(props: {
       props.onView({ zoom: props.view.zoom, cx: nx, cy: ny });
       return;
     }
-    const factor = Math.exp(-e.deltaY * 0.01);
+    // Clamp: a mouse wheel notch is ~100px; trackpads send small deltas.
+    const factor = Math.exp(-Math.max(-30, Math.min(30, e.deltaY)) * 0.01);
     let next = scale * factor;
     if (next <= fit) {
       props.onView({ zoom: 'fit', cx: 0.5, cy: 0.5 });
