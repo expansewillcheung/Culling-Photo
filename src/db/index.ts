@@ -1,2 +1,4 @@
-// CONTRACT (owned by persistence agent). See src/db/README section in PLAN.md §5.
-export {};
+// Persistence module (SQLite-WASM in a worker, OPFS SAH pool VFS). Schema: see ./store.ts.
+export { openDb, createDbWorker } from './client';
+export type { DbClient } from './client';
+export * from './types';
