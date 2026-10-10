@@ -6,6 +6,46 @@
 
 ---
 
+## 0. 实施状态（2026-10-10）
+
+Phase 0–3 已全部实现，Phase 4（Tauri 桌面版 / 云端协作）未开始。
+
+### 0.1 已完成
+| 模块 | 位置 | 说明 |
+|---|---|---|
+| 格式解析 | `src/formats/` | CR2/CR3/NEF/ARW/RAF/ORF/RW2/DNG/PEF/SRW + JPEG/HEIC/AVIF/PNG/WebP/GIF/TIFF/JXL；每个文件最多读 334 KB；15 款相机样本逐项对照 exiftool |
+| 快速缩略图 | `src/pipeline/jpegDc.ts` | 自写 DC-only JPEG 解码器（1/8 尺寸，不做 IDCT），比 Chrome 全尺寸解码快 2–2.5 倍，误差 MAE < 1 |
+| WASM 解码 | `src/decoders/` | HEIC（libheif）、TIFF（utif2）、JXL（jsquash）、RAW 后备（LibRaw，半尺寸 demosaic），全部按需加载 |
+| 流水线 | `src/pipeline/pool.ts`、`src/app/session.ts` | 多 Worker、优先级队列、4 条通道（普通 / 重型 WASM / LibRaw / 元数据），后台任务始终给交互操作留一个槽位 |
+| 界面 | `src/ui/` | 虚拟网格、放大视图（适合屏幕 / 100% / 拖动 / 滚轮缩放 / 按住空格）、2–4 张同步对比、胶片条、EXIF + 直方图、高光/阴影溢出提示 |
+| 持久化 | `src/db/` | SQLite-WASM（OPFS），多标签页冲突时自动降级为内存模式；文件夹有新增文件时，只为大小和修改时间都没变的文件恢复标记 |
+| XMP | `src/formats/xmp.ts`、`src/export/sidecars.ts` | 标记后自动写入 `照片名.xmp`，与 Lightroom / darktable 已有的 sidecar 合并、不破坏原有内容 |
+| 交付 | `src/export/` | `_Picks/`（可按星级分子文件夹）、`_Rejects/`，先写日志再操作，崩溃后也能还原；只读模式可以导出 XMP 压缩包或 CSV |
+| AI | `src/ai/` | 清晰度（四方向二阶导、分块）、pHash 连拍分组、每组推荐、智能淘汰建议（模糊 / 闭眼 / 重复 / 过曝 / 欠曝）、MediaPipe 闭眼检测（首次使用需联网下载约 4 MB 模型） |
+
+### 0.2 与原计划的差异
+- 放大视图用 Canvas2D 而不是 WebGL2：ImageBitmap 的 drawImage 已经走 GPU，100% 缩放和拖动都流畅，没必要引入 WebGL。
+- Photomator 是否读取 XMP sidecar，在 Linux 测试环境中无法验证。因此默认交付方式是「移动到 `_Picks/` 文件夹」（一定可行），同时写 XMP。
+- 「内嵌 XMP 写入 JPEG」（§6 方式 C）没有实现：会修改原文件，风险大于收益。
+- 文件夹再次打开时按文件夹名匹配之前的会话，而不是要求完全相同的指纹（见 0.1 持久化）。
+
+### 0.3 实测性能
+测试环境：4 核云容器，headless Chromium，生产构建，3,000 张照片（`npm run bench`）。
+
+| 指标 | 目标 | 3,000 张 RAW | 3,000 张混合格式（含 260 张 HEIC/JXL） |
+|---|---|---|---|
+| 第一张缩略图出现 | < 1.5 s | 1.5 s | 1.4 s |
+| 全部缩略图（首次） | < 60 s（M 系列 Mac） | 100 s（4 核） | 306 s（4 核） |
+| 内存 | < 2 GB | 75 MB | 1.7 GB |
+| 放大视图切换（已预载） | < 50 ms | 2–4 ms | 2–7 ms |
+| 快速连按切换（未预载） | < 250 ms | ≤ 186 ms | 偶尔 500 ms（重型解码占满 worker 时） |
+| 100% 缩放 | — | 274 ms | 288 ms |
+| 按键到 UI 反馈 | < 16 ms | 事件处理约 2 ms | 同左 |
+
+M 系列 Mac 有 8–12 个核心，单核也更快。按 7 个 worker 推算，3,000 张 RAW 预计 30–45 秒完成，但这个数字还没有在真机上测过。HEIC/JXL 只能用单线程 WASM 解码（每张 1.5–2.5 秒），是混合格式最主要的瓶颈。
+
+---
+
 ## 1. 目标与约束
 
 ### 1.1 已确定的需求
