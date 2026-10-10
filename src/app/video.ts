@@ -1,5 +1,26 @@
+// At most two <video> elements decoding at once (phone folders can hold hundreds of clips).
+let active = 0;
+const waiters: (() => void)[] = [];
+async function acquire() {
+  if (active >= 2) await new Promise<void>((r) => waiters.push(r));
+  active++;
+}
+function release() {
+  active--;
+  waiters.shift()?.();
+}
+
 /** Grab a poster frame from a video file on the main thread (workers can't use <video>). */
 export async function videoThumb(file: File, maxEdge = 512): Promise<Blob | null> {
+  await acquire();
+  try {
+    return await grab(file, maxEdge);
+  } finally {
+    release();
+  }
+}
+
+async function grab(file: File, maxEdge: number): Promise<Blob | null> {
   const url = URL.createObjectURL(file);
   try {
     const v = document.createElement('video');

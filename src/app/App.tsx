@@ -23,7 +23,10 @@ export function App() {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
 
-  const openSource = async (source: FileSource) => {
+  // Serialise opens: a second open (e.g. reopen after delivery) waits for the first to finish.
+  let opening: Promise<void> = Promise.resolve();
+  const openSource = (source: FileSource) => (opening = opening.then(() => doOpen(source)));
+  const doOpen = async (source: FileSource) => {
     setBusy(true);
     setError('');
     try {
