@@ -13,7 +13,9 @@ export default defineConfig({
   preview: { headers: isolationHeaders },
   worker: { format: 'es' },
   optimizeDeps: {
-    exclude: ['@sqlite.org/sqlite-wasm', '@jsquash/jxl', 'libraw-wasm'],
+    exclude: ['@sqlite.org/sqlite-wasm', '@jsquash/jxl', 'libraw-wasm', 'libheif-js'],
+    // Workers' imports aren't discovered by the dep scanner; pre-bundle them up front to avoid reloads.
+    include: ['utif2', 'comlink'],
   },
   build: { target: 'es2022', sourcemap: true },
 });

@@ -13,6 +13,7 @@ test.beforeAll(() => {
 });
 
 test(`bench: open ${COUNT} photos, thumbnails, loupe, keys`, async ({ page }) => {
+  test.setTimeout(1_800_000);
   const logs: string[] = [];
   page.on('console', (m) => m.type() === 'error' && logs.push(m.text()));
   page.on('pageerror', (e) => logs.push(String(e)));
@@ -59,7 +60,12 @@ test(`bench: open ${COUNT} photos, thumbnails, loupe, keys`, async ({ page }) =>
     return p.metaDone >= p.total;
   }, null, { timeout: 300_000, polling: 250 });
   const tMeta = Date.now() - t0;
-  await page.waitForFunction(() => !!(window as any).__culling.store.state.progress.allThumbsAt, null, { timeout: 900_000, polling: 500 });
+  for (;;) {
+    const pr = await page.evaluate(() => ({ ...(window as any).__culling.store.state.progress }));
+    if (pr.allThumbsAt) break;
+    console.log(`t=${((Date.now() - t0) / 1000).toFixed(0)}s thumbs ${pr.thumbsDone}/${pr.total} errors ${pr.errors}`);
+    await page.waitForTimeout(10_000);
+  }
   const tAll = Date.now() - t0;
   const progress = await page.evaluate(() => ({ ...(window as any).__culling.store.state.progress }));
 
@@ -128,6 +134,9 @@ test(`bench: open ${COUNT} photos, thumbnails, loupe, keys`, async ({ page }) =>
     zoom100Ms: Math.round(zoomMs),
     memory: mem,
     consoleErrors: logs.slice(0, 10),
+    thumbStatsByFormat: await page.evaluate(() =>
+      Object.fromEntries(Object.entries((globalThis as any).__thumbStats).map(([k, v]: any) => [k, { n: v.n, avgMs: Math.round(v.ms / v.n), maxMs: Math.round(v.max) }])),
+    ),
   };
   console.log(JSON.stringify(result, null, 2));
   fs.mkdirSync('bench-results', { recursive: true });

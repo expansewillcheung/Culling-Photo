@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js';
 import { store } from '../store/store';
 import { ImageView, type View } from './ImageView';
 
@@ -30,10 +30,13 @@ export function Filmstrip() {
     return ids.slice(lo, i + span + 1).map((id, k) => ({ id, index: lo + k }));
   });
   let host!: HTMLDivElement;
-  const offset = () => {
-    const w = host?.clientWidth ?? 1200;
-    return w / 2 - W / 2 - Math.max(0, idx()) * W;
-  };
+  const [hostW, setHostW] = createSignal(1200);
+  onMount(() => {
+    const ro = new ResizeObserver(() => setHostW(host.clientWidth));
+    ro.observe(host);
+    onCleanup(() => ro.disconnect());
+  });
+  const offset = () => hostW() / 2 - W / 2 - Math.max(0, idx()) * W;
   return (
     <div class="filmstrip" ref={host}>
       <div class="track" style={{ transform: `translateX(${offset()}px)`, width: '0' }}>

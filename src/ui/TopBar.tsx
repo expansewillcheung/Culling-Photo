@@ -1,4 +1,4 @@
-import { createMemo, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Show } from 'solid-js';
 import { store } from '../store/store';
 import type { SortKey } from '../store/types';
 import { LABEL_COLORS, LABEL_KEYS, LABEL_NAMES } from './labels';
@@ -9,6 +9,8 @@ export function TopBar(props: { onClose: () => void }) {
   const lenses = createMemo(() => [...new Set(state.photos.map((p) => p.exif.lens).filter(Boolean) as string[])].sort());
   const kinds = createMemo(() => [...new Set(state.photos.flatMap((p) => p.kinds))].sort());
   const f = () => state.filter;
+  const [more, setMore] = createSignal(false);
+  const activeExtra = () => (f().kinds.length ? 1 : 0) + (f().camera ? 1 : 0) + (f().lens ? 1 : 0) + (f().text ? 1 : 0);
 
   return (
     <header class="topbar">
@@ -67,42 +69,21 @@ export function TopBar(props: { onClose: () => void }) {
         </For>
       </div>
       <button classList={{ on: f().stacks }} onClick={() => actions.setFilter({ stacks: !f().stacks })} title="连拍折叠：每组只显示推荐照片 (S)">
-        连拍折叠
+        连拍
       </button>
       <button classList={{ on: f().onlySuggested }} onClick={() => actions.setFilter({ onlySuggested: !f().onlySuggested })} title="只看智能筛选建议淘汰的照片">
-        建议淘汰
+        建议
+      </button>
+      <button classList={{ on: more() || activeExtra() > 0 }} onClick={() => setMore(!more())} title="按类型、相机、镜头、文件名筛选">
+        筛选{activeExtra() ? ` (${activeExtra()})` : ''}
       </button>
       <div class="spacer" />
-      <select class="hide-sm" value={f().kinds[0] ?? ''} onChange={(e) => actions.setFilter({ kinds: e.currentTarget.value ? [e.currentTarget.value as any] : [] })} title="文件类型">
-        <option value="">所有类型</option>
-        <For each={kinds()}>{(k) => <option value={k}>{k.toUpperCase()}</option>}</For>
-      </select>
-      <Show when={cameras().length > 1}>
-        <select class="hide-sm" value={f().camera} onChange={(e) => actions.setFilter({ camera: e.currentTarget.value })} title="相机">
-          <option value="">所有相机</option>
-          <For each={cameras()}>{(c) => <option value={c}>{c}</option>}</For>
-        </select>
-      </Show>
-      <Show when={lenses().length > 1}>
-        <select class="hide-sm" value={f().lens} onChange={(e) => actions.setFilter({ lens: e.currentTarget.value })} title="镜头">
-          <option value="">所有镜头</option>
-          <For each={lenses()}>{(c) => <option value={c}>{c}</option>}</For>
-        </select>
-      </Show>
-      <input
-        type="search"
-        placeholder="搜索文件名"
-        value={f().text}
-        onInput={(e) => actions.setFilter({ text: e.currentTarget.value })}
-        style={{ width: '130px' }}
-        class="hide-sm"
-      />
       <select value={state.sort} onChange={(e) => actions.setState('sort', e.currentTarget.value as SortKey)} title="排序">
-        <option value="time">按拍摄时间</option>
-        <option value="name">按文件名</option>
-        <option value="rating">按评分</option>
-        <option value="sharpness">按清晰度</option>
-        <option value="type">按类型</option>
+        <option value="time">拍摄时间</option>
+        <option value="name">文件名</option>
+        <option value="rating">评分</option>
+        <option value="sharpness">清晰度</option>
+        <option value="type">类型</option>
       </select>
       <button class="ghost" onClick={() => actions.setState('sortDesc', !state.sortDesc)} title="升序 / 降序">
         {state.sortDesc ? '↓' : '↑'}
@@ -115,7 +96,7 @@ export function TopBar(props: { onClose: () => void }) {
         value={state.settings.thumbSize}
         onInput={(e) => actions.setSettings({ thumbSize: Number(e.currentTarget.value) })}
         title="缩略图大小"
-        class="hide-sm"
+        class="hide-sm hide-md"
         style={{ width: '80px' }}
       />
       <button classList={{ on: state.settings.showInfo }} onClick={() => actions.setSettings({ showInfo: !state.settings.showInfo })} title="信息面板 (I)">
@@ -126,6 +107,36 @@ export function TopBar(props: { onClose: () => void }) {
       <button class="primary" onClick={() => actions.setState('dialog', 'deliver')} data-testid="deliver-btn">
         交付
       </button>
+      <Show when={more()}>
+        <div class="filterrow">
+      <select value={f().kinds[0] ?? ''} onChange={(e) => actions.setFilter({ kinds: e.currentTarget.value ? [e.currentTarget.value as any] : [] })} title="文件类型">
+        <option value="">所有类型</option>
+        <For each={kinds()}>{(k) => <option value={k}>{k.toUpperCase()}</option>}</For>
+      </select>
+      <Show when={cameras().length > 0}>
+        <select value={f().camera} onChange={(e) => actions.setFilter({ camera: e.currentTarget.value })} title="相机">
+          <option value="">所有相机</option>
+          <For each={cameras()}>{(c) => <option value={c}>{c}</option>}</For>
+        </select>
+      </Show>
+      <Show when={lenses().length > 0}>
+        <select value={f().lens} onChange={(e) => actions.setFilter({ lens: e.currentTarget.value })} title="镜头">
+          <option value="">所有镜头</option>
+          <For each={lenses()}>{(c) => <option value={c}>{c}</option>}</For>
+        </select>
+      </Show>
+      <input
+        type="search"
+        placeholder="搜索文件名"
+        value={f().text}
+        onInput={(e) => actions.setFilter({ text: e.currentTarget.value })}
+       
+      />
+          <Show when={activeExtra() > 0}>
+            <button class="ghost" onClick={() => actions.setFilter({ kinds: [], camera: '', lens: '', text: '' })}>清除</button>
+          </Show>
+        </div>
+      </Show>
     </header>
   );
 }

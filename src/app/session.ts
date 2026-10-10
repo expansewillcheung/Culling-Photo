@@ -1,5 +1,5 @@
 import { batch } from 'solid-js';
-import { produce } from 'solid-js/store';
+import { produce, unwrap } from 'solid-js/store';
 import type { Marks, ParsedFile } from '../core/types';
 import { hash64 } from '../core/util';
 import type { FileSource, SourceEntry } from '../fs/FileSource';
@@ -251,7 +251,7 @@ export class Session {
     try {
       // Parse may not be done yet for visible items: wait for its meta batch by parsing inline.
       const r = await this.pool.enqueue(`thumb:${id}`, priority, async (w) => {
-        let parsed = state.photos[id].parsed[state.photos[id].display];
+        let parsed = unwrap(state.photos[id].parsed[state.photos[id].display]);
         if (!parsed) {
           const [m] = await w.parseMany([{ file: entry.file, name: entry.name }]);
           parsed = m.parsed;
@@ -267,6 +267,11 @@ export class Session {
         return;
       }
       this.cachedThumbs.add(name);
+      const fmt = state.photos[id].parsed[state.photos[id].display]?.format ?? '?';
+      const st = (thumbStats[fmt] ??= { n: 0, ms: 0, max: 0 });
+      st.n++;
+      st.ms += r.ms;
+      st.max = Math.max(st.max, r.ms);
       batch(() => {
         set('photos', id, (ph) => ({
           ...ph,
@@ -341,7 +346,7 @@ export class Session {
     const entry = this.displayFile(p);
     const job = this.pool
       .enqueue(key, priority, async (w) => {
-        let parsed = state.photos[id].parsed[state.photos[id].display];
+        let parsed = unwrap(state.photos[id].parsed[state.photos[id].display]);
         if (!parsed) parsed = (await w.parseMany([{ file: entry.file, name: entry.name }]))[0].parsed;
         if (!parsed) throw new Error('unreadable');
         return w.render(entry.file, parsed, edge);
@@ -485,6 +490,10 @@ function suggestionFor(p: Photo, best?: Photo): string | undefined {
   if (p.exposure && p.exposure.clippedShadows > 0.4) return 'underexposed';
   return undefined;
 }
+
+/** Per-format thumbnail timing (worker-side ms), for diagnostics and the benchmark. */
+export const thumbStats: Record<string, { n: number; ms: number; max: number }> = {};
+(globalThis as any).__thumbStats = thumbStats;
 
 export let session: Session | undefined;
 export function setSession(s: Session | undefined) {
