@@ -90,19 +90,24 @@ export async function decodeOriented(file: Blob, parsed: ParsedFile, maxEdge: nu
       const own = await embeddedHasOrientation(file, emb);
       const o = own ?? orientation;
       const swapE = o >= 5 && o <= 8;
+      // Report the size of the largest preview (what a full-size render shows) whichever preview
+      // was decoded here, so the loupe's scale doesn't jump when the full render replaces it.
+      const full = pickEmbedded(parsed, 1e9) ?? emb;
+      const fw = full.width ?? emb.width, fh = full.height ?? emb.height;
       const fast = await dcThumb(blob, emb.width, emb.height, maxEdge, o);
       if (fast) {
-        const sw = emb.width ?? fast.width, sh = emb.height ?? fast.height;
-        return { bitmap: fast, sourceWidth: swapE ? sh : sw, sourceHeight: swapE ? sw : sh, source: 'embedded' };
+        if (!fw || !fh) return { bitmap: fast, sourceWidth: fast.width, sourceHeight: fast.height, source: 'embedded' };
+        return { bitmap: fast, sourceWidth: swapE ? fh : fw, sourceHeight: swapE ? fw : fh, source: 'embedded' };
       }
       if (own !== undefined) {
         // Embedded JPEG has its own EXIF orientation: the browser applies it.
         const bmp = await createImageBitmap(blob, resizeOpts(emb.width, emb.height, target, own));
-        return { bitmap: bmp, sourceWidth: bmp.width, sourceHeight: bmp.height, source: 'embedded' };
+        if (!fw || !fh) return { bitmap: bmp, sourceWidth: bmp.width, sourceHeight: bmp.height, source: 'embedded' };
+        return { bitmap: bmp, sourceWidth: swapE ? fh : fw, sourceHeight: swapE ? fw : fh, source: 'embedded' };
       }
       const raw = await createImageBitmap(blob, resizeOpts(emb.width, emb.height, target, 1));
-      const sw = emb.width ?? raw.width;
-      const sh = emb.height ?? raw.height;
+      const sw = fw ?? raw.width;
+      const sh = fh ?? raw.height;
       if (orientation === 1) return { bitmap: raw, sourceWidth: sw, sourceHeight: sh, source: 'embedded' };
       const oriented = orientBitmap(raw, orientation);
       raw.close();

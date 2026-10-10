@@ -49,6 +49,8 @@ export class WorkerPool {
   private meta: Slot;
   private queue = new Map<string, Job<any>>();
   private running = new Map<string, Promise<unknown>>();
+  private runningJobs = new Set<Job<any>>();
+  private terminated = false;
   private seq = 0;
   private perWorker: number;
   private maxHeavy: number;
@@ -73,6 +75,7 @@ export class WorkerPool {
   }
 
   enqueue<T>(key: string, priority: number, run: (w: Comlink.Remote<PreviewApi>) => Promise<T>, lane: Lane = 'normal'): Promise<T> {
+    if (this.terminated) return Promise.reject(new CancelledError());
     const r = this.running.get(key);
     if (r) return r as Promise<T>;
     const existing = this.queue.get(key);
@@ -103,9 +106,9 @@ export class WorkerPool {
     for (const j of this.queue.values()) j.priority = fn(j.key, j.priority);
   }
 
-  cancel(pred: (key: string) => boolean) {
+  cancel(pred: (key: string, priority: number) => boolean) {
     for (const [k, j] of this.queue) {
-      if (pred(k)) {
+      if (pred(k, j.priority)) {
         this.queue.delete(k);
         j.reject(new CancelledError());
       }
@@ -167,7 +170,9 @@ export class WorkerPool {
       } else if (job.lane === 'raw') w.raw++;
       const p = job.run(w.api);
       this.running.set(job.key, p);
+      this.runningJobs.add(job);
       p.then(job.resolve, job.reject).finally(() => {
+        this.runningJobs.delete(job);
         w.active--;
         if (job.lane === 'heavy') {
           w.heavy--;
@@ -180,7 +185,11 @@ export class WorkerPool {
   }
 
   terminate() {
+    this.terminated = true;
     this.cancel(() => true);
+    // Calls into a terminated worker never settle: fail them so awaiting callers move on.
+    for (const j of this.runningJobs) j.reject(new CancelledError());
+    this.runningJobs.clear();
     for (const w of [...this.workers, this.meta]) w.worker.terminate();
     this.workers = [];
   }

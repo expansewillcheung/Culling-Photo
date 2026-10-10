@@ -10,6 +10,9 @@ function afterMark() {
 
 let spaceZoom = false;
 
+const REPEATABLE = new Set(['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', '=', '+', '-', '0', '1', '2', '3', '4', '5', 'u', 'U']);
+const TOGGLE_MARKS = new Set(['p', 'P', 'x', 'X', '6', '7', '8', '9', 'v', 'V']);
+
 export function handleKey(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
@@ -34,6 +37,9 @@ export function handleKey(e: KeyboardEvent): boolean {
     return true;
   }
   if (mod) return false;
+  // Auto-repeat must not flip toggles on and off (holding P would end in a random state).
+  // Toggling marks may repeat only when auto-advance moves to a new photo each time.
+  if (e.repeat && !REPEATABLE.has(k) && !(state.settings.autoAdvance && TOGGLE_MARKS.has(k))) return true;
 
   const cols = state.view === 'grid' ? ((window as any).__gridCols as number) || 1 : 1;
   switch (k) {
