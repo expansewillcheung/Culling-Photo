@@ -4,8 +4,9 @@ import { LABEL_KEYS } from './labels';
 
 const { state, actions } = store;
 
-function afterMark() {
-  if (state.settings.autoAdvance && state.selection.length <= 1) actions.go(1);
+/** Auto-advance after a mark, unless the mark already moved focus (photo left the filtered view). */
+function afterMark(before: number) {
+  if (state.settings.autoAdvance && state.selection.length <= 1 && state.current === before) actions.go(1);
 }
 
 let spaceZoom = false;
@@ -23,6 +24,7 @@ export function handleKey(e: KeyboardEvent): boolean {
   }
   const mod = e.metaKey || e.ctrlKey;
   const k = e.key;
+  const cur = state.current;
 
   if (mod && (k === 'z' || k === 'Z')) {
     const ok = e.shiftKey ? actions.redo() : actions.undo();
@@ -96,17 +98,17 @@ export function handleKey(e: KeyboardEvent): boolean {
     case 'p':
     case 'P':
       actions.setFlag(state.photos[state.current]?.flag === 1 && state.selection.length <= 1 ? 0 : 1);
-      afterMark();
+      afterMark(cur);
       return true;
     case 'x':
     case 'X':
       actions.setFlag(state.photos[state.current]?.flag === -1 && state.selection.length <= 1 ? 0 : -1);
-      afterMark();
+      afterMark(cur);
       return true;
     case 'u':
     case 'U':
       actions.setFlag(0);
-      afterMark();
+      afterMark(cur);
       return true;
     case '0':
     case '1':
@@ -115,19 +117,19 @@ export function handleKey(e: KeyboardEvent): boolean {
     case '4':
     case '5':
       actions.setRating(Number(k));
-      afterMark();
+      afterMark(cur);
       return true;
     case '6':
     case '7':
     case '8':
     case '9':
       actions.toggleLabel(LABEL_KEYS[Number(k) - 6]);
-      afterMark();
+      afterMark(cur);
       return true;
     case 'v':
     case 'V':
       actions.toggleLabel('purple');
-      afterMark();
+      afterMark(cur);
       return true;
     case 'i':
     case 'I':
@@ -172,7 +174,10 @@ export function handleKeyUp(e: KeyboardEvent) {
 
 export const SHORTCUTS: [string, string][] = [
   ['← → ↑ ↓', '上一张 / 下一张（网格中按行移动）'],
-  ['Shift + 方向键', '扩展选择'],
+  ['Home / End', '第一张 / 最后一张'],
+  ['PageUp / PageDown', '向前 / 向后翻一屏'],
+  ['Shift + 方向键 / 单击', '扩展选择'],
+  ['⌘/Ctrl + 单击', '加选 / 取消选择'],
   ['Enter / E', '放大视图'],
   ['G / Esc', '回到网格'],
   ['C', '对比视图（选中 2–4 张，或当前与下一张）'],

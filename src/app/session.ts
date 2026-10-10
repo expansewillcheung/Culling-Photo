@@ -178,6 +178,12 @@ export class Session {
     }
     await Promise.all(jobs);
     if (this.disposed) return;
+    // The grid switches from filename to capture-time order now; if the user has not moved yet,
+    // keep focus on the first cell instead of wherever catalog photo #0 ended up.
+    if (state.current === 0 && state.selection.length === 0) {
+      const first = store.viewIds()[0];
+      if (first !== undefined) set('current', first);
+    }
     // Restore marks from sidecars for photos not restored from the DB.
     await this.readSidecars(saved);
     set('progress', 'phase', 'thumbs');

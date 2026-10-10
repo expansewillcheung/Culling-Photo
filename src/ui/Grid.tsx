@@ -93,7 +93,12 @@ export function Grid() {
 
   return (
     <div class="grid-scroll" ref={scroller} tabindex="-1" onScroll={() => setScrollTop(scroller.scrollTop)} data-testid="grid">
-      <Show when={viewIds().length === 0}>
+      <Show when={viewIds().length === 0 && state.photos.length === 0 && state.progress.phase !== 'listing'}>
+        <div class="empty">
+          <div>这个文件夹（包括子文件夹）里没有可以识别的照片或视频</div>
+        </div>
+      </Show>
+      <Show when={viewIds().length === 0 && state.photos.length > 0}>
         <div class="empty">
           <div>没有符合筛选条件的照片</div>
           <button onClick={() => actions.resetFilter()}>清除筛选</button>

@@ -41,7 +41,7 @@ export function InfoPanel() {
           <dd>{p()!.stem}</dd>
           <Show when={p()!.exif.captureTime}>
             <dt>拍摄时间</dt>
-            <dd>{new Date(p()!.exif.captureTime!).toISOString().replace('T', ' ').slice(0, 22)}</dd>
+            <dd>{new Date(p()!.exif.captureTime!).toISOString().replace('T', ' ').slice(0, 19)}</dd>
           </Show>
           <dt>相机</dt>
           <dd>{[p()!.exif.make, p()!.exif.model].filter(Boolean).join(' ') || '—'}</dd>

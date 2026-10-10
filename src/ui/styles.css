@@ -72,15 +72,17 @@ kbd {
 .stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 
 /* top bar */
-.topbar {
-  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
-  background: var(--bg-2); border-bottom: 1px solid var(--line); min-height: 44px; flex-wrap: wrap;
-}
-.topbar .title { font-weight: 600; display: flex; align-items: center; gap: 8px; margin-right: 4px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.topbar { min-width: 0; padding: 6px 10px; background: var(--bg-2); border-bottom: 1px solid var(--line); min-height: 44px; }
+/* One row on desktop: a long folder name shrinks (ellipsis) instead of pushing 交付 onto a second line. */
+.toprow { display: flex; align-items: center; gap: 6px; min-height: 31px; }
+.toprow > * { flex-shrink: 0; }
+.topbar .title { font-weight: 600; display: flex; align-items: center; gap: 8px; margin-right: 4px; max-width: 260px; min-width: 48px; flex-shrink: 1; white-space: nowrap; overflow: hidden; }
+.topbar .title .name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.topbar .title .count { flex: none; margin-left: 0; }
 .topbar .sep { width: 1px; height: 22px; background: var(--line); margin: 0 2px; }
-.topbar .spacer { flex: 1; }
+.topbar .spacer { flex: 1 1 0; }
 .topbar select { max-width: 170px; }
-.filterrow { flex-basis: 100%; display: flex; gap: 8px; align-items: center; padding-top: 4px; }
+.filterrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 6px; }
 .topbar input[type='search'] { width: 120px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; background: transparent; padding: 4px 9px; }
@@ -109,8 +111,8 @@ kbd {
 .cell .foot { position: absolute; left: 8px; right: 8px; bottom: 4px; height: 18px; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); }
 .cell .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .cell .stars { color: var(--accent); letter-spacing: -1px; font-size: 11px; }
-.cell .badges { position: absolute; top: 8px; left: 8px; display: flex; gap: 4px; }
-.cell .badge { font: 600 9.5px/1 var(--font); padding: 3px 4px; border-radius: 3px; background: rgba(10, 12, 15, .78); color: var(--text-2); letter-spacing: .3px; }
+.cell .badges { position: absolute; top: 8px; left: 8px; right: 26px; display: flex; gap: 4px; overflow: hidden; }
+.cell .badge { white-space: nowrap; flex: none; font: 600 9.5px/1 var(--font); padding: 3px 4px; border-radius: 3px; background: rgba(10, 12, 15, .78); color: var(--text-2); letter-spacing: .3px; }
 .cell .badge.warn { color: #ffcf6e; }
 .cell .badge.group { color: #9cc5ff; }
 .cell .badge.best { color: var(--pick); }
@@ -133,6 +135,7 @@ kbd {
 .viewer .hud .flag.reject { color: var(--reject); font-weight: 700; }
 .viewer .hud .stars { color: var(--accent); }
 .viewer .zoomtag { position: absolute; right: 12px; top: 10px; font: 12px var(--mono); color: var(--text-2); background: rgba(0,0,0,.5); padding: 2px 6px; border-radius: 4px; pointer-events: none; }
+.viewer .empty { pointer-events: none; text-align: center; padding: 16px; }
 .viewer .loading { position: absolute; right: 12px; bottom: 10px; font-size: 11px; color: var(--text-3); pointer-events: none; }
 .viewer .lowres { position: absolute; left: 12px; bottom: 10px; font-size: 11px; color: #ffcf6e; background: rgba(0,0,0,.55); padding: 2px 6px; border-radius: 4px; pointer-events: none; }
 .viewer video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
@@ -162,6 +165,8 @@ kbd {
 
 /* status bar */
 .status { display: flex; align-items: center; gap: 14px; padding: 4px 12px; background: var(--bg-2); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--text-2); min-height: 28px; font-variant-numeric: tabular-nums; }
+.status { flex-wrap: wrap; row-gap: 2px; }
+.status > span { white-space: nowrap; }
 .status .spacer { flex: 1; }
 .status .bar { width: 120px; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
 .status .bar > i { display: block; height: 100%; background: var(--accent); }
@@ -212,6 +217,17 @@ kbd {
 }
 @media (max-width: 1500px) {
   .topbar .hide-md { display: none; }
+}
+/* Keep the whole toolbar (incl. 交付) on one row on 1280–1366px laptop screens. */
+@media (max-width: 1400px) {
+  .toprow { gap: 4px; }
+  .toprow > button { padding-left: 8px; padding-right: 8px; }
+  .toprow > button.ghost { padding-left: 6px; padding-right: 6px; }
+  .topbar .seg button { padding-left: 7px; padding-right: 7px; }
+}
+/* Too narrow for one row: wrap rather than overflow. */
+@media (max-width: 1220px) {
+  .toprow { flex-wrap: wrap; }
 }
 @media (max-width: 720px) {
   .info { display: none; }
