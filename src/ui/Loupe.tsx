@@ -1,8 +1,11 @@
-import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createMemo, createRoot, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js';
 import { store } from '../store/store';
 import { ImageView, type View } from './ImageView';
 
+/** Zoom/pan shared by the loupe and compare views (so Z / Space work in both). */
 export const [loupeView, setLoupeView] = createSignal<View>({ zoom: 'fit', cx: 0.5, cy: 0.5 });
+// Every view switch starts at "fit".
+createRoot(() => createEffect(on(() => store.state.view, () => setLoupeView({ zoom: 'fit', cx: 0.5, cy: 0.5 }), { defer: true })));
 
 export function Loupe() {
   const { state } = store;

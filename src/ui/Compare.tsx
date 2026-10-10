@@ -1,12 +1,11 @@
-import { createMemo, createSignal, For } from 'solid-js';
+import { createMemo, For } from 'solid-js';
 import { store } from '../store/store';
-import { ImageView, type View } from './ImageView';
-import { Filmstrip } from './Loupe';
+import { ImageView } from './ImageView';
+import { Filmstrip, loupeView, setLoupeView } from './Loupe';
 
 /** Up to 4 photos side by side with synchronised zoom/pan. */
 export function Compare() {
   const { state } = store;
-  const [view, setView] = createSignal<View>({ zoom: 'fit', cx: 0.5, cy: 0.5 });
   const ids = createMemo(() => store.compareIds());
   const cols = () => (ids().length <= 2 ? ids().length : 2);
   const rows = () => (ids().length <= 2 ? 1 : 2);
@@ -17,8 +16,8 @@ export function Compare() {
           {(id) => (
             <ImageView
               id={id}
-              view={view()}
-              onView={setView}
+              view={loupeView()}
+              onView={setLoupeView}
               active={state.current === id}
               onActivate={() => store.actions.setState('current', id)}
               showClipping={state.settings.showClipping}

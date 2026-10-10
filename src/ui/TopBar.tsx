@@ -14,11 +14,12 @@ export function TopBar(props: { onClose: () => void }) {
 
   return (
     <header class="topbar">
+      <div class="toprow">
       <button class="ghost" title="关闭文件夹" onClick={props.onClose}>
         ‹
       </button>
       <div class="title" title={state.sourceName}>
-        {state.sourceName}
+        <span class="name">{state.sourceName}</span>
         <Show when={!state.writable}>
           <span class="count">（只读）</span>
         </Show>
@@ -78,7 +79,7 @@ export function TopBar(props: { onClose: () => void }) {
         筛选{activeExtra() ? ` (${activeExtra()})` : ''}
       </button>
       <div class="spacer" />
-      <select value={state.sort} onChange={(e) => actions.setState('sort', e.currentTarget.value as SortKey)} title="排序">
+      <select value={state.sort} onChange={(e) => (actions.setState('sort', e.currentTarget.value as SortKey), e.currentTarget.blur())} title="排序">
         <option value="time">拍摄时间</option>
         <option value="name">文件名</option>
         <option value="rating">评分</option>
@@ -95,6 +96,7 @@ export function TopBar(props: { onClose: () => void }) {
         step="20"
         value={state.settings.thumbSize}
         onInput={(e) => actions.setSettings({ thumbSize: Number(e.currentTarget.value) })}
+        onChange={(e) => e.currentTarget.blur()}
         title="缩略图大小"
         class="hide-sm hide-md"
         style={{ width: '80px' }}
@@ -107,20 +109,21 @@ export function TopBar(props: { onClose: () => void }) {
       <button class="primary" onClick={() => actions.setState('dialog', 'deliver')} data-testid="deliver-btn">
         交付
       </button>
+      </div>
       <Show when={more()}>
         <div class="filterrow">
-      <select value={f().kinds[0] ?? ''} onChange={(e) => actions.setFilter({ kinds: e.currentTarget.value ? [e.currentTarget.value as any] : [] })} title="文件类型">
+      <select value={f().kinds[0] ?? ''} onChange={(e) => (actions.setFilter({ kinds: e.currentTarget.value ? [e.currentTarget.value as any] : [] }), e.currentTarget.blur())} title="文件类型">
         <option value="">所有类型</option>
         <For each={kinds()}>{(k) => <option value={k}>{k.toUpperCase()}</option>}</For>
       </select>
       <Show when={cameras().length > 0}>
-        <select value={f().camera} onChange={(e) => actions.setFilter({ camera: e.currentTarget.value })} title="相机">
+        <select value={f().camera} onChange={(e) => (actions.setFilter({ camera: e.currentTarget.value }), e.currentTarget.blur())} title="相机">
           <option value="">所有相机</option>
           <For each={cameras()}>{(c) => <option value={c}>{c}</option>}</For>
         </select>
       </Show>
       <Show when={lenses().length > 0}>
-        <select value={f().lens} onChange={(e) => actions.setFilter({ lens: e.currentTarget.value })} title="镜头">
+        <select value={f().lens} onChange={(e) => (actions.setFilter({ lens: e.currentTarget.value }), e.currentTarget.blur())} title="镜头">
           <option value="">所有镜头</option>
           <For each={lenses()}>{(c) => <option value={c}>{c}</option>}</For>
         </select>
@@ -130,7 +133,7 @@ export function TopBar(props: { onClose: () => void }) {
         placeholder="搜索文件名"
         value={f().text}
         onInput={(e) => actions.setFilter({ text: e.currentTarget.value })}
-       
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
       />
           <Show when={activeExtra() > 0}>
             <button class="ghost" onClick={() => actions.setFilter({ kinds: [], camera: '', lens: '', text: '' })}>清除</button>

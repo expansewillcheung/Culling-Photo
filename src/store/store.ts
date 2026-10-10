@@ -1,4 +1,4 @@
-import { batch, createMemo, createRoot } from 'solid-js';
+import { batch, createEffect, createMemo, createRoot, on } from 'solid-js';
 import { createStore, produce, reconcile } from 'solid-js/store';
 import type { ColorLabel, Flag, Marks } from '../core/types';
 import { DEFAULT_FILTER, DEFAULT_SETTINGS, type Filter, type Photo, type Progress, type Settings, type SortKey, type ViewMode } from './types';
@@ -39,6 +39,8 @@ function loadSettings(): Settings {
 
 export const emptyProgress = (): Progress => ({
   phase: 'idle', listed: 0, metaDone: 0, thumbsDone: 0, facesDone: 0, total: 0, startedAt: 0, errors: 0,
+  // Explicit undefined so path-setting a fresh progress clears timings from a previous open.
+  firstThumbAt: undefined, allThumbsAt: undefined,
 });
 
 interface Change {
@@ -136,6 +138,29 @@ function createAppStore() {
     return { total: state.photos.length, picks, rejects, rated, unflagged };
   });
 
+  // Keep focus and selection inside what is shown: when a filter (or a mark under a filter such as
+  // 未标记) hides the current photo, move to the photo that took its place, and drop hidden photos
+  // from the selection so marking never touches photos the user cannot see.
+  let lastIndex = 0;
+  createEffect(() => {
+    const i = viewIndex().get(state.current);
+    if (i !== undefined) lastIndex = i;
+  });
+  createEffect(
+    on(viewIndex, (idx) => {
+      batch(() => {
+        if (state.selection.some((id) => !idx.has(id))) {
+          const sel = state.selection.filter((id) => idx.has(id));
+          setState('selection', sel.length > 1 ? sel : []);
+        }
+        const ids = viewIds();
+        if (state.current >= 0 && !idx.has(state.current) && ids.length) {
+          setState('current', ids[Math.min(lastIndex, ids.length - 1)]);
+        }
+      });
+    }),
+  );
+
   const photo = (id: number): Photo | undefined => state.photos[id];
   const currentPhoto = () => photo(state.current);
   const currentIndex = () => viewIndex().get(state.current) ?? -1;
@@ -178,7 +203,8 @@ function createAppStore() {
 
   /** Targets for a marking action: selection if any, else the current photo. */
   function targets(): number[] {
-    if (state.selection.length > 1) return [...state.selection];
+    // In compare view the selection is the set being compared; marks go to the active photo.
+    if (state.selection.length > 1 && state.view !== 'compare') return [...state.selection];
     return state.current >= 0 ? [state.current] : [];
   }
 

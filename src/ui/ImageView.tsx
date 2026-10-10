@@ -254,7 +254,15 @@ export function ImageView(props: {
       <Show when={props.hud !== false && photo()}>
         <Hud id={props.id} />
       </Show>
-      <div class="zoomtag">{props.view.zoom === 'fit' ? `适合 · ${zoomLabel()}` : zoomLabel()}</div>
+      <Show when={entry() || thumb()}>
+        <div class="zoomtag">{props.view.zoom === 'fit' ? `适合 · ${zoomLabel()}` : zoomLabel()}</div>
+      </Show>
+      <Show when={!entry() && !thumb() && !loading() && photo()?.thumbState === 'error'}>
+        <div class="empty">
+          <div>无法预览这张照片</div>
+          <div class="count">{photo()?.error}</div>
+        </div>
+      </Show>
       <Show when={loading()}>
         <div class="loading">加载中…</div>
       </Show>
