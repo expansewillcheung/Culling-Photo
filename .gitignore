@@ -1,0 +1,12 @@
+node_modules
+dist
+test-results
+playwright-report
+.vitest-attachments
+*.log
+.wrangler
+bench-results/*.tmp
+tests/fixtures/raw/*
+tests/fixtures/gen/*
+tests/fixtures/groundtruth.json
+tests/browser/__screenshots__
