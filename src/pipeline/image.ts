@@ -3,6 +3,27 @@ import type { EmbeddedImage, ParsedFile } from '../core/types';
 import { blobReader } from '../core/types';
 import { parseFile, pickEmbedded } from '../formats';
 import { decodeFallback, needsFallback } from '../decoders';
+import { dcDecodeWorthIt, decodeJpegDc } from './jpegDc';
+
+/**
+ * Fast path for thumbnails from large JPEGs: DC-only decode at 1/8 scale (2-3x faster than a
+ * full decode, which Chrome always does even with resize options). Returns null to fall back.
+ */
+async function dcThumb(jpeg: Blob, w: number | undefined, h: number | undefined, maxEdge: number, orientation: number): Promise<ImageBitmap | null> {
+  if (!w || !h || !maxEdge || !dcDecodeWorthIt(w, h, maxEdge)) return null;
+  const dc = decodeJpegDc(new Uint8Array(await jpeg.arrayBuffer()));
+  if (!dc) return null;
+  const [dw, dh] = fitSize(dc.width, dc.height, maxEdge);
+  const bmp = await createImageBitmap(new ImageData(dc.data as Uint8ClampedArray<ArrayBuffer>, dc.width, dc.height), {
+    resizeWidth: dw,
+    resizeHeight: dh,
+    resizeQuality: 'high',
+  });
+  if (orientation === 1) return bmp;
+  const c = orientBitmap(bmp, orientation);
+  bmp.close();
+  return c instanceof OffscreenCanvas ? c.transferToImageBitmap() : c;
+}
 
 const NATIVE = new Set(['jpeg', 'png', 'webp', 'avif', 'gif']);
 
@@ -67,6 +88,13 @@ export async function decodeOriented(file: Blob, parsed: ParsedFile, maxEdge: nu
     if (emb && (longEnough || !needsFallback(parsed))) {
       const blob = file.slice(emb.offset, emb.offset + emb.length, 'image/jpeg');
       const own = await embeddedHasOrientation(file, emb);
+      const o = own ?? orientation;
+      const swapE = o >= 5 && o <= 8;
+      const fast = await dcThumb(blob, emb.width, emb.height, maxEdge, o);
+      if (fast) {
+        const sw = emb.width ?? fast.width, sh = emb.height ?? fast.height;
+        return { bitmap: fast, sourceWidth: swapE ? sh : sw, sourceHeight: swapE ? sw : sh, source: 'embedded' };
+      }
       if (own !== undefined) {
         // Embedded JPEG has its own EXIF orientation: the browser applies it.
         const bmp = await createImageBitmap(blob, resizeOpts(emb.width, emb.height, target, own));
@@ -87,6 +115,13 @@ export async function decodeOriented(file: Blob, parsed: ParsedFile, maxEdge: nu
   if (NATIVE.has(parsed.kind)) {
     const w = parsed.exif.width;
     const h = parsed.exif.height;
+    if (parsed.kind === 'jpeg') {
+      const fast = await dcThumb(file, w, h, maxEdge, orientation);
+      if (fast) {
+        const swap = orientation >= 5 && orientation <= 8;
+        return { bitmap: fast, sourceWidth: swap ? h! : w!, sourceHeight: swap ? w! : h!, source: 'native' };
+      }
+    }
     const bmp = await createImageBitmap(file, resizeOpts(w, h, target, orientation));
     const swap = orientation >= 5 && orientation <= 8;
     const sw = w && h ? (swap ? h : w) : bmp.width;
