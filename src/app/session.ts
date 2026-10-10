@@ -51,6 +51,12 @@ export class Session {
   private objectUrls: string[] = [];
   private renderWaiters = new Map<string, Promise<RenderEntry | undefined>>();
   private disposed = false;
+  /** True once this session's photos are in the store (until then it still holds the previous folder's). */
+  private loaded = false;
+  /** Photos whose marks came from the DB or were set by the user: XMP/EXIF must not override them. */
+  private marksSettled = new Set<number>();
+  /** Ids last reported on screen (+ read-ahead) by the grid. */
+  private onScreen = new Set<number>();
   private uiQueue: (() => void)[] = [];
   private uiScheduled = false;
   /** Parsed headers per photo id, kept outside the reactive store. */
@@ -59,7 +65,7 @@ export class Session {
   private analyzeTimer = 0;
   private saveTimer = 0;
   private dirtyMarks = new Set<number>();
-  onDirtyMarks?: (ids: number[]) => void;
+  onDirtyMarks?: (ids: number[]) => void | Promise<unknown>;
   /** Hooks wired by the app (XMP reader etc.). */
   hooks: {
     readSidecar?: (entry: SourceEntry) => Promise<Partial<Marks> | null>;
@@ -75,6 +81,8 @@ export class Session {
     if (persist) this.persist = persist;
     const t0 = performance.now();
     set('progress', { ...emptyProgress(), phase: 'listing', startedAt: t0 });
+    // Photo ids are per folder: the previous folder's undo history would hit the wrong photos.
+    actions.resetHistory();
     set('sourceName', source.name);
     set('writable', source.writable);
     const entries = await source.list((n) => set('progress', 'listed', n));
@@ -98,6 +106,7 @@ export class Session {
       if (s.marks) {
         restoredIds.push(p.id);
         restoredMarks.push(s.marks);
+        this.marksSettled.add(p.id);
       }
       p.captureTime = s.captureTime ?? p.captureTime;
       p.blurScore = s.blurScore;
@@ -113,6 +122,7 @@ export class Session {
       set('view', 'grid');
       set('progress', (p) => ({ ...p, phase: 'meta', total: photos.length }));
     });
+    this.loaded = true;
     if (restoredIds.length) actions.loadMarks(restoredIds, restoredMarks);
     this.unsubscribe = store.actions.onMarks((ids) => this.markDirty(ids));
     this.hooks.afterOpen?.(this);
@@ -153,7 +163,7 @@ export class Session {
             w.parseMany(ids.flatMap((id) => photos[id].item.files.map((f) => ({ file: f.file, name: f.name })))),
             'meta',
           )
-          .then((results) => new Promise<void>((done) => this.ui(() => {
+          .then((results) => new Promise<void>((done) => this.uiAlways(() => {
             if (this.disposed) return done();
             let k = 0;
             set(
@@ -180,10 +190,13 @@ export class Session {
     if (this.disposed) return;
     // Restore marks from sidecars for photos not restored from the DB.
     await this.readSidecars(saved);
+    if (this.disposed) return;
     set('progress', 'phase', 'thumbs');
-    // Queue background thumbs for everything (visible ones were already bumped).
+    // Queue background thumbs for everything; already queued (visible) ones keep their priority.
     const order = store.viewIds();
-    order.forEach((id, i) => this.requestThumb(id, PRIORITY.background + i));
+    order.forEach((id, i) => {
+      if (!this.pool.has(`thumb:${id}`)) this.requestThumb(id, PRIORITY.background + i);
+    });
     void this.persist.saveAll(state.photos).catch(() => {});
   }
 
@@ -199,7 +212,7 @@ export class Session {
     if (p.captureTime === undefined) p.captureTime = p.exif.captureTime ?? p.item.files[0].lastModified;
     const w = p.exif.width, h = p.exif.height, o = p.exif.orientation ?? 1;
     if (w && h) p.aspect = o >= 5 && o <= 8 ? h / w : w / h;
-    if (p.exif.rating !== undefined && p.rating === 0 && p.flag === 0) {
+    if (p.exif.rating !== undefined && p.rating === 0 && p.flag === 0 && !this.marksSettled.has(p.id)) {
       if (p.exif.rating < 0) p.flag = -1;
       else p.rating = Math.min(5, p.exif.rating);
     }
@@ -219,7 +232,9 @@ export class Session {
         marks.push({ rating: m.rating ?? p.rating, flag: m.flag ?? p.flag, label: m.label ?? p.label });
       }),
     );
-    if (ids.length) actions.loadMarks(ids, marks);
+    if (this.disposed) return;
+    const keep = ids.map((id, i) => [id, marks[i]] as const).filter(([id]) => !this.marksSettled.has(id));
+    if (keep.length) actions.loadMarks(keep.map((k) => k[0]), keep.map((k) => k[1]));
   }
 
   /** Parsed header of the photo's display file (plain object, safe to post to workers). */
@@ -241,6 +256,13 @@ export class Session {
    * cost one re-sort/re-render instead of N.
    */
   private ui(fn: () => void) {
+    // Updates computed by a session that has since been disposed must not touch the next folder.
+    this.uiAlways(() => {
+      if (!this.disposed) fn();
+    });
+  }
+
+  private uiAlways(fn: () => void) {
     this.uiQueue.push(fn);
     if (this.uiScheduled) return;
     this.uiScheduled = true;
@@ -265,6 +287,7 @@ export class Session {
 
   /** Ensure a thumbnail exists (cached or generated) at the given priority. */
   requestThumb(id: number, priority: number) {
+    if (!this.loaded || this.disposed) return;
     const p = state.photos[id];
     if (!p || p.thumbState === 'ready' || p.thumbState === 'error') return;
     const key = `thumb:${id}`;
@@ -291,8 +314,12 @@ export class Session {
     }
     if (p.kinds[p.display] === 'video') {
       const blob = await videoThumb(entry.file).catch(() => null);
-      if (blob) this.setThumb(id, blob);
-      else set('photos', id, { thumbState: 'error', error: 'video' });
+      this.ui(() => {
+        if (blob) return this.setThumb(id, blob);
+        set('photos', id, { thumbState: 'error', error: 'video' });
+        set('progress', 'errors', (n) => n + 1);
+        this.bumpThumbProgress();
+      });
       return;
     }
     try {
@@ -336,6 +363,7 @@ export class Session {
       });
       this.scheduleAnalysis();
     } catch (e) {
+      if (this.disposed) return;
       if (e instanceof CancelledError) {
         set('photos', id, 'thumbState', 'none');
         return;
@@ -363,6 +391,7 @@ export class Session {
         next.allThumbsAt = now;
         next.phase = 'done';
         setTimeout(() => {
+          if (this.disposed) return;
           this.regroup();
           void this.persist.saveAll(state.photos).catch(() => {});
         }, 0);
@@ -373,6 +402,14 @@ export class Session {
 
   /** Called by the grid with the ids currently on screen (in order). */
   setVisible(ids: number[], ahead: number[] = []) {
+    if (!this.loaded || this.disposed) return;
+    // Cells scrolled past go back to background order, so the screen the user stopped on wins.
+    const now = new Set([...ids, ...ahead]);
+    const index = store.viewIndex();
+    for (const id of this.onScreen) {
+      if (!now.has(id)) this.pool.setPriority(`thumb:${id}`, PRIORITY.background + (index.get(id) ?? 0));
+    }
+    this.onScreen = now;
     ids.forEach((id, i) => this.requestThumb(id, PRIORITY.visible + i));
     ahead.forEach((id, i) => this.requestThumb(id, PRIORITY.visible + 100 + i));
   }
@@ -395,7 +432,7 @@ export class Session {
       return waiting;
     }
     const p = state.photos[id];
-    if (!p || p.kinds[p.display] === 'video') return Promise.resolve(undefined);
+    if (!this.loaded || this.disposed || !p || p.kinds[p.display] === 'video') return Promise.resolve(undefined);
     const entry = this.displayFile(p);
     const job = this.pool
       .enqueue(key, priority, async (w) => {
@@ -428,9 +465,14 @@ export class Session {
     const i = store.viewIndex().get(id);
     if (i === undefined) return;
     const edge = this.screenEdge();
-    const keep: string[] = [this.renders.key(id, edge), this.renders.key(id, 0)];
+    // Every image on screen (all compare panes, not just the one calling) keeps its renders.
+    const panes = state.view === 'compare' ? store.compareIds() : [id];
+    const keep: string[] = panes.flatMap((pid) => [this.renders.key(pid, edge), this.renders.key(pid, 0)]);
+    const paneSet = new Set(panes);
     // Drop stale preloads that are no longer near.
-    this.pool.cancel((k) => k.startsWith('render:') && !k.endsWith('@0') && !this.isNear(k, ids, i, radius + 1));
+    this.pool.cancel(
+      (k) => k.startsWith('render:') && !k.endsWith('@0') && !paneSet.has(renderId(k)) && !this.isNear(k, ids, i, radius + 1),
+    );
     for (let d = 1; d <= radius; d++) {
       for (const j of [i + d, i - d]) {
         const nid = ids[j];
@@ -443,7 +485,7 @@ export class Session {
   }
 
   private isNear(key: string, ids: number[], i: number, r: number) {
-    const id = Number(key.slice(7, key.indexOf('@')));
+    const id = renderId(key);
     const j = store.viewIndex().get(id);
     return j !== undefined && Math.abs(j - i) <= r && ids[j] === id;
   }
@@ -502,7 +544,10 @@ export class Session {
   }
 
   private markDirty(ids: number[]) {
-    for (const id of ids) this.dirtyMarks.add(id);
+    for (const id of ids) {
+      this.dirtyMarks.add(id);
+      this.marksSettled.add(id);
+    }
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => this.flushMarks(), 600);
   }
@@ -515,19 +560,30 @@ export class Session {
     if (!ids.length) return;
     const photos = ids.map((id) => state.photos[id]).filter(Boolean);
     await this.persist.saveMarks(photos).catch((e) => console.warn('save marks', e));
-    this.onDirtyMarks?.(ids);
+    // Wait for the sidecar writes too: delivery moves those files right after flushing.
+    await Promise.resolve(this.onDirtyMarks?.(ids)).catch((e) => console.warn('write sidecars', e));
+  }
+
+  get isDisposed() {
+    return this.disposed;
   }
 
   async dispose() {
     await this.flushMarks().catch(() => {});
     this.disposed = true;
     this.unsubscribe?.();
-    this.pool.cancel(() => true);
+    clearTimeout(this.analyzeTimer);
+    // Each session owns its pool: terminate it or every reopen leaks its workers (and LibRaw memory).
+    this.pool.terminate();
     this.renders.clear();
     for (const u of this.objectUrls) URL.revokeObjectURL(u);
     this.objectUrls = [];
     await this.persist.close().catch(() => {});
   }
+}
+
+function renderId(key: string) {
+  return Number(key.slice(7, key.indexOf('@')));
 }
 
 function suggestionFor(p: Photo, best?: Photo): string | undefined {

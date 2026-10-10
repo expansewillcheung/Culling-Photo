@@ -139,6 +139,14 @@ function createAppStore() {
   const photo = (id: number): Photo | undefined => state.photos[id];
   const currentPhoto = () => photo(state.current);
   const currentIndex = () => viewIndex().get(state.current) ?? -1;
+  /** Photos shown side by side in the compare view. */
+  const compareIds = (): number[] => {
+    if (state.selection.length >= 2) return state.selection.slice(0, 4);
+    // No multi-selection: compare current with the next photo.
+    const all = viewIds();
+    const i = Math.max(0, currentIndex());
+    return all.slice(i, i + 2);
+  };
 
   function marksOf(p: Photo): Marks {
     return { rating: p.rating, flag: p.flag, label: p.label };
@@ -246,8 +254,10 @@ function createAppStore() {
         } else {
           const ids = viewIds();
           const a = currentIndex();
-          const anchor = state.selection.length ? viewIndex().get(state.selection[0]) ?? a : a;
           const b = viewIndex().get(id) ?? a;
+          let anchor = state.selection.length ? viewIndex().get(state.selection[0]) ?? a : a;
+          // Current photo hidden by the filter: there is no anchor on screen, start from the click.
+          if (anchor < 0) anchor = b;
           const [lo, hi] = anchor < b ? [anchor, b] : [b, anchor];
           const range = ids.slice(lo, hi + 1);
           // keep anchor first
@@ -272,6 +282,10 @@ function createAppStore() {
     },
     setFilter(patch: Partial<Filter>) {
       setState('filter', (f) => ({ ...f, ...patch }));
+      // Photos the new filter hides must not stay (invisibly) selected: marking would hit them.
+      const vis = viewIndex();
+      const sel = state.selection.filter((id) => vis.has(id));
+      if (sel.length !== state.selection.length) setState('selection', sel.length > 1 ? sel : []);
     },
     resetFilter() {
       setState('filter', reconcile({ ...DEFAULT_FILTER }));
@@ -294,11 +308,16 @@ function createAppStore() {
         if (state.toast === t) setState('toast', '');
       }, ms);
     },
+    /** Forget undo/redo history (ids are only meaningful within one opened folder). */
+    resetHistory() {
+      undoStack.length = 0;
+      redoStack.length = 0;
+    },
     canUndo: () => undoStack.length > 0,
     canRedo: () => redoStack.length > 0,
   };
 
-  return { state, actions, viewIds, viewIndex, counts, photo, currentPhoto, currentIndex, marksOf };
+  return { state, actions, viewIds, viewIndex, counts, photo, currentPhoto, currentIndex, compareIds, marksOf };
 }
 
 export const store = createRoot(createAppStore);

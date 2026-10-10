@@ -63,7 +63,13 @@ export default function DeliverDialog() {
     }
   };
 
-  const plan = createMemo(() => planDelivery(state.photos.map(toDelivery), opts()));
+  // After a delivery the folder is rescanned and _Picks/ shows up as a subfolder: delivering
+  // those photos again would "move" each pick onto itself and rename it 'IMG (1).CR3'.
+  const undelivered = (p: Photo) => {
+    const top = p.dirRel.split('/')[0];
+    return top !== (opts().picksDir ?? '_Picks') && top !== (opts().rejectsDir ?? '_Rejects');
+  };
+  const plan = createMemo(() => planDelivery(state.photos.filter(undelivered).map(toDelivery), opts()));
   const hasPairs = () => state.photos.some((p) => p.item.files.length > 1);
 
   const run = async () => {
@@ -97,6 +103,7 @@ export default function DeliverDialog() {
     if (!confirm('把上次交付移动的文件全部移回原位？')) return;
     setBusy(true);
     try {
+      await session?.flushMarks(); // pending sidecar writes must land before files move back
       const res = await restoreDelivery(r, undefined, (p) => setProgress(p));
       setProgress(null);
       await refetch();

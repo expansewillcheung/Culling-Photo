@@ -27,7 +27,7 @@ export async function wireSession(s: Session, source: FileSource): Promise<void>
   let writing: Promise<unknown> = Promise.resolve();
   s.onDirtyMarks = (ids) => {
     const root = source.root;
-    if (!root || !source.writable || !state.settings.writeXmp) return;
+    if (!root || !source.writable || !state.settings.writeXmp) return writing;
     const items = ids
       .map((id) => state.photos[id])
       .filter((p) => p && (p.rating || p.flag || p.label || hasSidecar.has(p.id)))
@@ -36,7 +36,7 @@ export async function wireSession(s: Session, source: FileSource): Promise<void>
         const primary = p.item.rawIndex >= 0 ? p.item.files[p.item.rawIndex] : p.item.files[0];
         return { relPath: primary.relPath, marks: { rating: p.rating, flag: p.flag, label: p.label } };
       });
-    if (!items.length) return;
+    if (!items.length) return writing;
     writing = writing
       .then(() => writeSidecars(root, items))
       .then((res) => {
@@ -44,5 +44,6 @@ export async function wireSession(s: Session, source: FileSource): Promise<void>
         if (errors.length) actions.toast(`XMP 写入失败 ${errors.length} 个：${errors[0].error}`, 5000);
       })
       .catch((e) => actions.toast(`XMP 写入失败：${(e as Error).message}`, 5000));
+    return writing;
   };
 }

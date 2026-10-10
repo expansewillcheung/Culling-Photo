@@ -24,7 +24,8 @@ export async function analyzeFaces(s: Session): Promise<void> {
     const CONCURRENCY = 2;
     let next = 0;
     const work = async () => {
-      while (next < ids.length && !failed) {
+      // Stop when the folder is closed/switched: ids would point at the next folder's photos.
+      while (next < ids.length && !failed && !s.isDisposed) {
         const id = ids[next++];
         const p = state.photos[id];
         const entry = s.displayFile(p);
@@ -41,6 +42,7 @@ export async function analyzeFaces(s: Session): Promise<void> {
             s.laneFor(p),
           );
           const res = await ai.analyze(r.bitmap, { faces: true, maxEdge: 512, faceMaxEdge: 1024 });
+          if (s.isDisposed) break;
           if (res.faces === null) {
             failed = true;
             actions.toast('人脸模型加载失败（需要联网下载一次），已停止分析', 5000);
@@ -60,6 +62,7 @@ export async function analyzeFaces(s: Session): Promise<void> {
     ai.terminate();
     running = false;
   }
+  if (s.isDisposed) return;
   s.regroup();
   void s.persist.saveAll(state.photos).catch(() => {});
   if (!failed) {

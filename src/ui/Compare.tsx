@@ -5,15 +5,9 @@ import { Filmstrip } from './Loupe';
 
 /** Up to 4 photos side by side with synchronised zoom/pan. */
 export function Compare() {
-  const { state, viewIds } = store;
+  const { state } = store;
   const [view, setView] = createSignal<View>({ zoom: 'fit', cx: 0.5, cy: 0.5 });
-  const ids = createMemo(() => {
-    if (state.selection.length >= 2) return state.selection.slice(0, 4);
-    // No multi-selection: compare current with the next photo.
-    const all = viewIds();
-    const i = Math.max(0, store.currentIndex());
-    return all.slice(i, i + 2);
-  });
+  const ids = createMemo(() => store.compareIds());
   const cols = () => (ids().length <= 2 ? ids().length : 2);
   const rows = () => (ids().length <= 2 ? 1 : 2);
   return (
