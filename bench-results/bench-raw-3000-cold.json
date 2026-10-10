@@ -1,0 +1,148 @@
+{
+  "count": 3000,
+  "mix": "raw",
+  "cores": 4,
+  "tLibraryMs": 1458,
+  "tFirstScreenMs": 4301,
+  "tMetaAllMs": 20017,
+  "tAllThumbsMs": 100102,
+  "appFirstThumbMs": 1522,
+  "appAllThumbsMs": 99519,
+  "thumbErrors": 0,
+  "errorCells": [],
+  "scrollLongTasks": [
+    52
+  ],
+  "slowKeyEvents": [
+    {
+      "name": "keydown",
+      "d": 32,
+      "p": 5.035000000032596
+    },
+    {
+      "name": "keyup",
+      "d": 32,
+      "p": 0.0849999999627471
+    },
+    {
+      "name": "keydown",
+      "d": 24,
+      "p": 3.425000000046566
+    },
+    {
+      "name": "keyup",
+      "d": 24,
+      "p": 0.025000000023283064
+    },
+    {
+      "name": "keydown",
+      "d": 16,
+      "p": 1.0150000000139698
+    },
+    {
+      "name": "keyup",
+      "d": 16,
+      "p": 0.024999999906867743
+    },
+    {
+      "name": "keydown",
+      "d": 16,
+      "p": 3.644999999902211
+    },
+    {
+      "name": "keydown",
+      "d": 16,
+      "p": 0.7149999999674037
+    },
+    {
+      "name": "keyup",
+      "d": 16,
+      "p": 0.024999999906867743
+    },
+    {
+      "name": "keydown",
+      "d": 16,
+      "p": 0.18500000005587935
+    }
+  ],
+  "loupeNextPreloadedMs": [
+    3,
+    2,
+    4,
+    2,
+    3,
+    3
+  ],
+  "loupeNextRapidMs": [
+    2,
+    3,
+    186,
+    46,
+    3,
+    147
+  ],
+  "zoom100Ms": 274,
+  "memory": {
+    "uaBytes": 74743959,
+    "jsHeap": 39695627,
+    "isolated": true
+  },
+  "consoleErrors": [],
+  "thumbStatsByFormat": {
+    "DNG": {
+      "n": 400,
+      "avgMs": 239,
+      "maxMs": 517
+    },
+    "CR3": {
+      "n": 400,
+      "avgMs": 96,
+      "maxMs": 534
+    },
+    "RAF": {
+      "n": 400,
+      "avgMs": 176,
+      "maxMs": 548
+    },
+    "CR2": {
+      "n": 200,
+      "avgMs": 192,
+      "maxMs": 543
+    },
+    "SRW": {
+      "n": 200,
+      "avgMs": 239,
+      "maxMs": 543
+    },
+    "NEF": {
+      "n": 400,
+      "avgMs": 120,
+      "maxMs": 467
+    },
+    "RW2": {
+      "n": 200,
+      "avgMs": 121,
+      "maxMs": 515
+    },
+    "ARW": {
+      "n": 400,
+      "avgMs": 131,
+      "maxMs": 462
+    },
+    "ORF": {
+      "n": 200,
+      "avgMs": 154,
+      "maxMs": 337
+    },
+    "PEF": {
+      "n": 200,
+      "avgMs": 235,
+      "maxMs": 383
+    },
+    "JPEG": {
+      "n": 20,
+      "avgMs": 105,
+      "maxMs": 127
+    }
+  }
+}

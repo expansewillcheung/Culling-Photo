@@ -12,3 +12,5 @@ tests/fixtures/groundtruth.json
 tests/browser/__screenshots__
 bench-data
 .claude/worktrees
+tests/fixtures/raw
+tests/fixtures/gen
