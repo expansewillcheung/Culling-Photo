@@ -54,6 +54,8 @@ export class WorkerPool {
   private maxHeavy: number;
   private heavyActive = 0;
   onIdle?: () => void;
+  /** Jobs at or above this priority (background work) always leave one slot free for interactive jobs. */
+  backgroundPriority = 1000;
 
   constructor(size = defaultPoolSize(), perWorker = 2) {
     this.size = size;
@@ -112,7 +114,7 @@ export class WorkerPool {
 
   /** Slot a job of this lane could start on right now, if any. */
   private slotFor(lane: Lane): Slot | undefined {
-    if (lane === 'meta') return this.meta.active < 4 ? this.meta : undefined;
+    if (lane === 'meta') return this.meta.active < 8 ? this.meta : undefined;
     if (lane === 'raw') {
       const w = this.workers[0];
       return w.raw === 0 && w.active < this.perWorker ? w : undefined;
@@ -139,7 +141,11 @@ export class WorkerPool {
       }
       let pick: Job | undefined;
       let slot: Slot | undefined;
+      const capacity = this.workers.length * this.perWorker;
+      let busy = 0;
+      for (const w of this.workers) busy += w.active;
       for (const j of [...bestByLane.values()].sort((a, b) => a.priority - b.priority || a.seq - b.seq)) {
+        if (j.lane !== 'meta' && j.priority >= this.backgroundPriority && busy >= capacity - 1) continue;
         const s = this.slotFor(j.lane);
         if (s) {
           pick = j;

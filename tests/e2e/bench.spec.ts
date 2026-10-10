@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const COUNT = Number(process.env.BENCH_COUNT ?? 3000);
-const DIR = path.resolve(`bench-data/shoot-${COUNT}`);
+const MIX = process.env.BENCH_MIX ?? 'all';
+const DIR = path.resolve(`bench-data/shoot-${MIX}-${COUNT}`);
 
 test.beforeAll(() => {
   if (!fs.existsSync(DIR) || fs.readdirSync(DIR).length < COUNT) {
@@ -118,6 +119,7 @@ test(`bench: open ${COUNT} photos, thumbnails, loupe, keys`, async ({ page }) =>
 
   const result = {
     count: COUNT,
+    mix: MIX,
     cores: await page.evaluate(() => navigator.hardwareConcurrency),
     tLibraryMs: tLibrary,
     tFirstScreenMs: tFirstScreen,
@@ -140,6 +142,6 @@ test(`bench: open ${COUNT} photos, thumbnails, loupe, keys`, async ({ page }) =>
   };
   console.log(JSON.stringify(result, null, 2));
   fs.mkdirSync('bench-results', { recursive: true });
-  fs.writeFileSync(`bench-results/bench-${COUNT}-${process.env.BENCH_WARM === '1' ? 'warm' : 'cold'}.json`, JSON.stringify(result, null, 2));
+  fs.writeFileSync(`bench-results/bench-${MIX}-${COUNT}-${process.env.BENCH_WARM === '1' ? 'warm' : 'cold'}.json`, JSON.stringify(result, null, 2));
   expect(progress.errors).toBe(0);
 });

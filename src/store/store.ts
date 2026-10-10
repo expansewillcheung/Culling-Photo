@@ -96,7 +96,10 @@ function createAppStore() {
     // Photo ids follow catalog order, which is already natural-sorted by folder + name.
     const byName = (a: Photo, b: Photo) => a.id - b.id;
     let cmp: (a: Photo, b: Photo) => number;
-    switch (state.sort) {
+    // Until every header is parsed, keep filename order (camera counters are near-chronological):
+    // re-sorting on each metadata batch would shuffle the grid under the user.
+    const metaReady = state.progress.total > 0 && state.progress.metaDone >= state.progress.total;
+    switch (state.sort === 'time' && !metaReady ? 'name' : state.sort) {
       case 'time':
         cmp = (a, b) => ((a.captureTime ?? Infinity) - (b.captureTime ?? Infinity) || byName(a, b)) * dir;
         break;

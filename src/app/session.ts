@@ -43,7 +43,7 @@ function mergeExif(parsed: (ParsedFile | null)[], display: number) {
 
 export class Session {
   pool: WorkerPool;
-  renders = new RenderCache(14, 2);
+  renders = new RenderCache(9, 1);
   source?: FileSource;
   cacheNs = '';
   persist: PersistAdapter = new MemoryPersist();

@@ -53,7 +53,7 @@ export function Grid() {
   // Keep the current photo in view.
   createEffect(
     on(
-      () => [state.current, cols(), cellH()] as const,
+      () => [state.current, cols(), cellH(), store.viewIndex().get(state.current)] as const,
       ([cur]) => {
         const i = store.viewIndex().get(cur);
         if (i === undefined || !scroller) return;

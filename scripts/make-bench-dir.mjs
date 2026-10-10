@@ -8,7 +8,9 @@ const count = Number(countArg);
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const srcDirs = [path.join(root, 'tests/fixtures/raw'), path.join(root, 'tests/fixtures/gen')];
 const sources = srcDirs.flatMap((d) => (fs.existsSync(d) ? fs.readdirSync(d).map((f) => path.join(d, f)) : []))
-  .filter((f) => !/\.(json|txt)$/i.test(f) && !path.basename(f).startsWith('DSC01234'));
+  .filter((f) => !/\.(json|txt)$/i.test(f) && !path.basename(f).startsWith('DSC01234'))
+  // BENCH_MIX=raw: camera RAW files only (a typical shoot); default: every format.
+  .filter((f) => process.env.BENCH_MIX !== 'raw' || f.includes('/raw/'));
 // Weighted mix: mostly RAW (typical shoot), some JPEG/HEIC.
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
