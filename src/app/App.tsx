@@ -14,6 +14,7 @@ import { HelpDialog, SettingsDialog } from '../ui/Dialogs';
 import { handleKey, handleKeyUp } from '../ui/keyboard';
 import { wireSession } from './wiring';
 import { emptyProgress } from '../store/store';
+import { appActions } from './appActions';
 
 const DeliverDialog = lazy(() => import('../ui/DeliverDialog'));
 
@@ -58,6 +59,11 @@ export function App() {
     await session?.dispose();
     setSession(undefined);
     actions.setState({ screen: 'welcome', photos: [], current: -1, selection: [], dialog: '', progress: emptyProgress() });
+  };
+
+  appActions.reopen = async () => {
+    const src = session?.source;
+    if (src) await openSource(src instanceof FsAccessSource ? new FsAccessSource(src.root) : src);
   };
 
   onMount(() => {

@@ -35,6 +35,9 @@ export function StatusBar() {
           完成 · 首屏 {secs(pr().firstThumbAt)} · 全部 {secs(pr().allThumbsAt)}
         </span>
       </Show>
+      <Show when={pr().facesDone > 0}>
+        <span>人脸 {pr().facesDone}</span>
+      </Show>
       <Show when={pr().errors > 0}>
         <span class="warn">{pr().errors} 个文件无法预览</span>
       </Show>

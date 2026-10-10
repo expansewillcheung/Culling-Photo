@@ -82,7 +82,9 @@ export class Session {
     this.cacheNs = hash64(`ns|${source.name}`);
     const [cached, saved] = await Promise.all([
       cacheList(this.cacheNs),
-      this.persist.open(source.name, fingerprint(entries)).catch(() => new Map()),
+      this.persist
+        .open(source.name, fingerprint(entries), new Map(entries.map((e) => [e.relPath, { size: e.size, mtime: e.lastModified }])))
+        .catch((e) => (console.warn('persistence unavailable', e), new Map())),
     ]);
     this.cachedThumbs = cached;
     set('persistent', this.persist.persistent);
@@ -360,6 +362,10 @@ export class Session {
       if (thumbsDone >= pr.total && !pr.allThumbsAt) {
         next.allThumbsAt = now;
         next.phase = 'done';
+        setTimeout(() => {
+          this.regroup();
+          void this.persist.saveAll(state.photos).catch(() => {});
+        }, 0);
       }
       return next;
     });

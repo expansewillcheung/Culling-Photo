@@ -1,7 +1,6 @@
 import { batch, createMemo, createRoot } from 'solid-js';
 import { createStore, produce, reconcile } from 'solid-js/store';
 import type { ColorLabel, Flag, Marks } from '../core/types';
-import { cmpNatural } from '../pipeline/catalog';
 import { DEFAULT_FILTER, DEFAULT_SETTINGS, type Filter, type Photo, type Progress, type Settings, type SortKey, type ViewMode } from './types';
 
 export interface AppState {
@@ -94,7 +93,8 @@ function createAppStore() {
       out.push(p);
     }
     const dir = state.sortDesc ? -1 : 1;
-    const byName = (a: Photo, b: Photo) => (a.dirRel === b.dirRel ? cmpNatural(a.stem, b.stem) : cmpNatural(a.dirRel, b.dirRel));
+    // Photo ids follow catalog order, which is already natural-sorted by folder + name.
+    const byName = (a: Photo, b: Photo) => a.id - b.id;
     let cmp: (a: Photo, b: Photo) => number;
     switch (state.sort) {
       case 'time':
