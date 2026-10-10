@@ -91,7 +91,7 @@ export function InfoPanel() {
             {(f, i) => (
               <div>
                 {f.relPath} · {formatBytes(f.size)}
-                {p()!.parsed[i()] ? ` · ${p()!.parsed[i()]!.format}` : ''}
+                {p()!.formats[i()] ? ` · ${p()!.formats[i()]}` : ''}
               </div>
             )}
           </For>

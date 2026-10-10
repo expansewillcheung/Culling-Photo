@@ -1,10 +1,11 @@
 import { batch } from 'solid-js';
-import { produce, unwrap } from 'solid-js/store';
+import { produce } from 'solid-js/store';
 import type { Marks, ParsedFile } from '../core/types';
 import { hash64 } from '../core/util';
 import type { FileSource, SourceEntry } from '../fs/FileSource';
 import { buildCatalog, fingerprint, type CatalogItem } from '../pipeline/catalog';
-import { CancelledError, WorkerPool } from '../pipeline/pool';
+import { CancelledError, WorkerPool, type Lane } from '../pipeline/pool';
+import { needsFallback } from '../decoders';
 import { cacheGet, cacheList } from '../cache/opfs';
 import { groupBursts, hamming, pickBest } from '../ai';
 import { store, emptyProgress } from '../store/store';
@@ -50,6 +51,10 @@ export class Session {
   private objectUrls: string[] = [];
   private renderWaiters = new Map<string, Promise<RenderEntry | undefined>>();
   private disposed = false;
+  private uiQueue: (() => void)[] = [];
+  private uiScheduled = false;
+  /** Parsed headers per photo id, kept outside the reactive store. */
+  parsedById: (ParsedFile | null)[][] = [];
   private unsubscribe?: () => void;
   private analyzeTimer = 0;
   private saveTimer = 0;
@@ -122,7 +127,7 @@ export class Session {
       item,
       display: 0,
       kinds: item.kinds,
-      parsed: item.files.map(() => null),
+      formats: item.files.map(() => ''),
       metaDone: false,
       exif: {},
       rating: 0,
@@ -144,9 +149,10 @@ export class Session {
         this.pool
           .enqueue(`meta:${start}`, PRIORITY.meta + start / 1e6, (w) =>
             w.parseMany(ids.flatMap((id) => photos[id].item.files.map((f) => ({ file: f.file, name: f.name })))),
+            'meta',
           )
-          .then((results) => {
-            if (this.disposed) return;
+          .then((results) => new Promise<void>((done) => this.ui(() => {
+            if (this.disposed) return done();
             let k = 0;
             set(
               'photos',
@@ -161,7 +167,8 @@ export class Session {
               }),
             );
             set('progress', 'metaDone', (n) => n + ids.length);
-          })
+            done();
+          })))
           .catch((e) => {
             if (!(e instanceof CancelledError)) console.error(e);
           }),
@@ -179,7 +186,8 @@ export class Session {
   }
 
   private applyParsed(p: Photo, parsed: (ParsedFile | null)[]) {
-    p.parsed = parsed;
+    this.parsedById[p.id] = parsed;
+    p.formats = parsed.map((x) => x?.format ?? '');
     p.metaDone = true;
     // Display: first decodable (files are already display-ranked); skip failed parses.
     let display = parsed.findIndex((x) => x && x.kind !== 'other');
@@ -212,6 +220,43 @@ export class Session {
     if (ids.length) actions.loadMarks(ids, marks);
   }
 
+  /** Parsed header of the photo's display file (plain object, safe to post to workers). */
+  parsedOf(id: number): ParsedFile | null {
+    const p = state.photos[id];
+    return this.parsedById[id]?.[p?.display ?? 0] ?? null;
+  }
+
+  laneFor(p: Photo): Lane {
+    const kind = p.kinds[p.display];
+    if (kind === 'heic' || kind === 'jxl' || kind === 'tiff') return 'heavy';
+    const parsed = this.parsedOf(p.id);
+    if (kind === 'raw' && parsed && needsFallback(parsed)) return 'raw';
+    return 'normal';
+  }
+
+  /**
+   * Coalesce store updates from worker results into one batch per frame, so N results
+   * cost one re-sort/re-render instead of N.
+   */
+  private ui(fn: () => void) {
+    this.uiQueue.push(fn);
+    if (this.uiScheduled) return;
+    this.uiScheduled = true;
+    const flush = () => {
+      if (!this.uiScheduled) return;
+      this.uiScheduled = false;
+      const fns = this.uiQueue;
+      this.uiQueue = [];
+      const t = performance.now();
+      batch(() => {
+        for (const f of fns) f();
+      });
+      perfLog('ui-flush', performance.now() - t);
+    };
+    requestAnimationFrame(flush);
+    setTimeout(flush, 100); // rAF doesn't run in background tabs
+  }
+
   displayFile(p: Photo): SourceEntry {
     return p.item.files[p.display] ?? p.item.files[0];
   }
@@ -238,7 +283,7 @@ export class Session {
     if (this.cachedThumbs.has(name) && !needAnalysis) {
       const f = await cacheGet(this.cacheNs, name);
       if (f) {
-        this.setThumb(id, f);
+        this.ui(() => this.setThumb(id, f));
         return;
       }
     }
@@ -251,30 +296,32 @@ export class Session {
     try {
       // Parse may not be done yet for visible items: wait for its meta batch by parsing inline.
       const r = await this.pool.enqueue(`thumb:${id}`, priority, async (w) => {
-        let parsed = unwrap(state.photos[id].parsed[state.photos[id].display]);
+        let parsed = this.parsedOf(id);
         if (!parsed) {
           const [m] = await w.parseMany([{ file: entry.file, name: entry.name }]);
           parsed = m.parsed;
         }
         if (!parsed) throw new Error('unreadable file');
         return w.thumb(entry.file, parsed, this.cacheNs, name, state.settings.analyze);
-      });
+      }, this.laneFor(state.photos[id]));
       if (this.disposed) return;
       if (!r.ok || !r.thumb) {
-        set('photos', id, { thumbState: 'error', error: r.error });
-        set('progress', 'errors', (n) => n + 1);
-        this.bumpThumbProgress();
+        this.ui(() => {
+          set('photos', id, { thumbState: 'error', error: r.error });
+          set('progress', 'errors', (n) => n + 1);
+          this.bumpThumbProgress();
+        });
         return;
       }
       this.cachedThumbs.add(name);
-      const fmt = state.photos[id].parsed[state.photos[id].display]?.format ?? '?';
+      const fmt = this.parsedOf(id)?.format ?? '?';
       const st = (thumbStats[fmt] ??= { n: 0, ms: 0, max: 0 });
       st.n++;
       st.ms += r.ms;
       st.max = Math.max(st.max, r.ms);
-      batch(() => {
-        set('photos', id, (ph) => ({
-          ...ph,
+      this.ui(() => {
+        const ph = state.photos[id];
+        set('photos', id, {
           sourceWidth: r.sourceWidth,
           sourceHeight: r.sourceHeight,
           aspect: r.width / r.height,
@@ -282,7 +329,7 @@ export class Session {
           phash: r.phash ?? ph.phash,
           exposure: r.exposure,
           histogram: r.histogram,
-        }));
+        });
         this.setThumb(id, r.thumb!);
       });
       this.scheduleAnalysis();
@@ -346,11 +393,11 @@ export class Session {
     const entry = this.displayFile(p);
     const job = this.pool
       .enqueue(key, priority, async (w) => {
-        let parsed = unwrap(state.photos[id].parsed[state.photos[id].display]);
+        let parsed = this.parsedOf(id);
         if (!parsed) parsed = (await w.parseMany([{ file: entry.file, name: entry.name }]))[0].parsed;
         if (!parsed) throw new Error('unreadable');
         return w.render(entry.file, parsed, edge);
-      })
+      }, this.laneFor(p))
       .then((r) => {
         const e: RenderEntry = { bitmap: r.bitmap, sourceWidth: r.sourceWidth, sourceHeight: r.sourceHeight, edge };
         if (this.disposed) {
@@ -400,11 +447,13 @@ export class Session {
     this.analyzeTimer = window.setTimeout(() => {
       this.analyzeTimer = 0;
       this.regroup();
-    }, 1500);
+    }, state.progress.allThumbsAt ? 300 : 4000);
   }
 
   /** Burst grouping + best-pick + smart-cull suggestions from available analysis. */
   regroup() {
+    const tm = performance.now();
+    queueMicrotask(() => perfLog('regroup', performance.now() - tm));
     const photos = state.photos;
     const sorted = [...photos].sort((a, b) => (a.captureTime ?? 0) - (b.captureTime ?? 0));
     const items = sorted.map((p) => ({ id: p.id, captureTime: p.captureTime, hash: p.phash ? BigInt('0x' + p.phash) : undefined }));
@@ -494,6 +543,14 @@ function suggestionFor(p: Photo, best?: Photo): string | undefined {
 /** Per-format thumbnail timing (worker-side ms), for diagnostics and the benchmark. */
 export const thumbStats: Record<string, { n: number; ms: number; max: number }> = {};
 (globalThis as any).__thumbStats = thumbStats;
+
+const perf: Record<string, { n: number; ms: number; max: number }> = ((globalThis as any).__perf = {});
+export function perfLog(name: string, ms: number) {
+  const e = (perf[name] ??= { n: 0, ms: 0, max: 0 });
+  e.n++;
+  e.ms += ms;
+  e.max = Math.max(e.max, ms);
+}
 
 export let session: Session | undefined;
 export function setSession(s: Session | undefined) {

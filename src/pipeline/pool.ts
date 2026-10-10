@@ -7,36 +7,60 @@ export class CancelledError extends Error {
   }
 }
 
+/**
+ * normal: cheap JS/native decode. heavy: WASM decoders that block a worker for seconds
+ * (HEIC, JXL, TIFF) — capped so they never occupy every worker. raw: LibRaw demosaic —
+ * pinned to worker 0 so only one LibRaw instance (256 MB+ shared memory) ever exists.
+ * meta: header parsing, served by a dedicated worker so it never queues behind decodes.
+ */
+export type Lane = 'normal' | 'heavy' | 'raw' | 'meta';
+
 interface Job<T = unknown> {
   key: string;
   priority: number;
   seq: number;
+  lane: Lane;
   run: (w: Comlink.Remote<PreviewApi>) => Promise<T>;
   resolve: (v: T) => void;
   reject: (e: unknown) => void;
   promise: Promise<T>;
 }
 
+interface Slot {
+  api: Comlink.Remote<PreviewApi>;
+  worker: Worker;
+  active: number;
+  heavy: number;
+  raw: number;
+}
+
+function spawn(name: string): Slot {
+  const worker = new Worker(new URL('../workers/preview.worker.ts', import.meta.url), { type: 'module', name });
+  return { api: Comlink.wrap<PreviewApi>(worker), worker, active: 0, heavy: 0, raw: 0 };
+}
+
 /**
- * Worker pool with a priority queue (lower number = sooner), key de-duplication and
- * cancellation of queued (not yet started) jobs.
+ * Worker pool with a priority queue (lower number = sooner), key de-duplication,
+ * lanes, and cancellation of queued (not yet started) jobs.
  */
 export class WorkerPool {
   readonly size: number;
-  private workers: { api: Comlink.Remote<PreviewApi>; worker: Worker; active: number }[] = [];
+  private workers: Slot[] = [];
+  private meta: Slot;
   private queue = new Map<string, Job<any>>();
   private running = new Map<string, Promise<unknown>>();
   private seq = 0;
   private perWorker: number;
+  private maxHeavy: number;
+  private heavyActive = 0;
   onIdle?: () => void;
 
   constructor(size = defaultPoolSize(), perWorker = 2) {
     this.size = size;
     this.perWorker = perWorker;
-    for (let i = 0; i < size; i++) {
-      const worker = new Worker(new URL('../workers/preview.worker.ts', import.meta.url), { type: 'module', name: `preview-${i}` });
-      this.workers.push({ api: Comlink.wrap<PreviewApi>(worker), worker, active: 0 });
-    }
+    this.maxHeavy = Math.max(1, Math.ceil((size * 2) / 3));
+    for (let i = 0; i < size; i++) this.workers.push(spawn(`preview-${i}`));
+    this.meta = spawn('meta');
   }
 
   get pending() {
@@ -46,13 +70,7 @@ export class WorkerPool {
     return this.running.size;
   }
 
-  /** Any worker, for one-off calls that should bypass the queue. */
-  direct(): Comlink.Remote<PreviewApi> {
-    const w = this.workers.reduce((a, b) => (b.active < a.active ? b : a));
-    return w.api;
-  }
-
-  enqueue<T>(key: string, priority: number, run: (w: Comlink.Remote<PreviewApi>) => Promise<T>): Promise<T> {
+  enqueue<T>(key: string, priority: number, run: (w: Comlink.Remote<PreviewApi>) => Promise<T>, lane: Lane = 'normal'): Promise<T> {
     const r = this.running.get(key);
     if (r) return r as Promise<T>;
     const existing = this.queue.get(key);
@@ -65,7 +83,7 @@ export class WorkerPool {
       resolve = res;
       reject = rej;
     });
-    this.queue.set(key, { key, priority, seq: this.seq++, run, resolve, reject, promise });
+    this.queue.set(key, { key, priority, seq: this.seq++, lane, run, resolve, reject, promise });
     this.pump();
     return promise;
   }
@@ -79,7 +97,6 @@ export class WorkerPool {
     if (j) j.priority = priority;
   }
 
-  /** Re-prioritise all queued jobs. */
   reprioritize(fn: (key: string, current: number) => number) {
     for (const j of this.queue.values()) j.priority = fn(j.key, j.priority);
   }
@@ -93,29 +110,63 @@ export class WorkerPool {
     }
   }
 
-  private pickNext(): Job | undefined {
-    let best: Job | undefined;
-    for (const j of this.queue.values()) {
-      if (!best || j.priority < best.priority || (j.priority === best.priority && j.seq < best.seq)) best = j;
+  /** Slot a job of this lane could start on right now, if any. */
+  private slotFor(lane: Lane): Slot | undefined {
+    if (lane === 'meta') return this.meta.active < 4 ? this.meta : undefined;
+    if (lane === 'raw') {
+      const w = this.workers[0];
+      return w.raw === 0 && w.active < this.perWorker ? w : undefined;
+    }
+    if (lane === 'heavy' && this.heavyActive >= this.maxHeavy) return undefined;
+    let best: Slot | undefined;
+    for (const w of this.workers) {
+      if (w.active >= this.perWorker) continue;
+      if (lane === 'heavy' && w.heavy > 0) continue;
+      // Prefer workers not busy with a blocking WASM decode.
+      const load = w.active + w.heavy * 2 + w.raw * 2;
+      if (!best || load < best.active + best.heavy * 2 + best.raw * 2) best = w;
     }
     return best;
   }
 
   private pump() {
     for (;;) {
-      const w = this.workers.reduce((a, b) => (b.active < a.active ? b : a));
-      if (w.active >= this.perWorker) return;
-      const job = this.pickNext();
-      if (!job) {
-        if (this.running.size === 0) this.onIdle?.();
+      // Best job per lane in one pass, then the highest-priority lane with capacity.
+      const bestByLane = new Map<Lane, Job>();
+      for (const j of this.queue.values()) {
+        const b = bestByLane.get(j.lane);
+        if (!b || j.priority < b.priority || (j.priority === b.priority && j.seq < b.seq)) bestByLane.set(j.lane, j);
+      }
+      let pick: Job | undefined;
+      let slot: Slot | undefined;
+      for (const j of [...bestByLane.values()].sort((a, b) => a.priority - b.priority || a.seq - b.seq)) {
+        const s = this.slotFor(j.lane);
+        if (s) {
+          pick = j;
+          slot = s;
+          break;
+        }
+      }
+      if (!pick || !slot) {
+        if (this.running.size === 0 && this.queue.size === 0) this.onIdle?.();
         return;
       }
+      const job = pick;
+      const w = slot;
       this.queue.delete(job.key);
       w.active++;
+      if (job.lane === 'heavy') {
+        w.heavy++;
+        this.heavyActive++;
+      } else if (job.lane === 'raw') w.raw++;
       const p = job.run(w.api);
       this.running.set(job.key, p);
       p.then(job.resolve, job.reject).finally(() => {
         w.active--;
+        if (job.lane === 'heavy') {
+          w.heavy--;
+          this.heavyActive--;
+        } else if (job.lane === 'raw') w.raw--;
         this.running.delete(job.key);
         this.pump();
       });
@@ -124,7 +175,7 @@ export class WorkerPool {
 
   terminate() {
     this.cancel(() => true);
-    for (const w of this.workers) w.worker.terminate();
+    for (const w of [...this.workers, this.meta]) w.worker.terminate();
     this.workers = [];
   }
 }

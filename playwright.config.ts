@@ -15,7 +15,7 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     viewport: { width: 1440, height: 900 },
     launchOptions: { executablePath: CHROMIUM, args: ['--enable-unsafe-webgpu'] },
-    trace: 'retain-on-failure',
+    trace: process.env.E2E_TRACE ? 'retain-on-failure' : 'off',
   },
   webServer: {
     command: prod ? `npx vite build && npx vite preview --port ${PORT} --strictPort` : `npx vite --port ${PORT} --strictPort`,

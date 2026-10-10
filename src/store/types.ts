@@ -1,4 +1,4 @@
-import type { ColorLabel, ExifInfo, FileKind, Flag, ParsedFile } from '../core/types';
+import type { ColorLabel, ExifInfo, FileKind, Flag } from '../core/types';
 import type { CatalogItem } from '../pipeline/catalog';
 
 export type ThumbState = 'none' | 'queued' | 'ready' | 'error';
@@ -12,7 +12,8 @@ export interface Photo {
   /** Index (into item.files) of the file used for display. */
   display: number;
   kinds: FileKind[];
-  parsed: (ParsedFile | null)[];
+  /** Container format label per file (e.g. 'CR3'), '' until parsed. */
+  formats: string[];
   metaDone: boolean;
   exif: ExifInfo;
   captureTime?: number;

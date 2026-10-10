@@ -29,17 +29,23 @@ const DISPLAY_RANK: Record<FileKind, number> = {
   jpeg: 0, webp: 1, avif: 2, png: 3, heic: 4, jxl: 5, tiff: 6, gif: 7, raw: 8, video: 9, xmp: 99, other: 99,
 };
 
-export interface CatalogItem {
-  /** Stable key: dirRel + '/' + lowercase stem. */
-  key: string;
-  stem: string;
-  dirRel: string;
+/**
+ * A logical photo (RAW+JPEG etc. sharing a basename). Deliberately a class: Solid stores
+ * don't proxy non-plain objects, so this immutable data stays raw (fast) inside the store.
+ */
+export class CatalogItem {
   /** Media files (no sidecars), display-preferred first. */
-  files: SourceEntry[];
-  kinds: FileKind[];
+  files: SourceEntry[] = [];
+  kinds: FileKind[] = [];
   sidecar?: SourceEntry;
   /** Index into files of the RAW member, if any. */
-  rawIndex: number;
+  rawIndex = -1;
+  constructor(
+    /** Stable key: dirRel + '/' + lowercase stem. */
+    readonly key: string,
+    readonly stem: string,
+    readonly dirRel: string,
+  ) {}
 }
 
 export function buildCatalog(entries: SourceEntry[]): CatalogItem[] {
@@ -60,7 +66,7 @@ export function buildCatalog(entries: SourceEntry[]): CatalogItem[] {
     const key = `${e.dirRel}/${stem.toLowerCase()}`;
     let item = map.get(key);
     if (!item) {
-      item = { key, stem, dirRel: e.dirRel, files: [], kinds: [], rawIndex: -1 };
+      item = new CatalogItem(key, stem, e.dirRel);
       map.set(key, item);
     }
     item.files.push(e);
