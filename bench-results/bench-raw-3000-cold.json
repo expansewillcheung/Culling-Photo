@@ -2,42 +2,43 @@
   "count": 3000,
   "mix": "raw",
   "cores": 4,
-  "tLibraryMs": 1458,
-  "tFirstScreenMs": 4301,
-  "tMetaAllMs": 20017,
-  "tAllThumbsMs": 100102,
-  "appFirstThumbMs": 1522,
-  "appAllThumbsMs": 99519,
+  "tLibraryMs": 1661,
+  "tFirstScreenMs": 3296,
+  "tMetaAllMs": 17564,
+  "tAllThumbsMs": 107683,
+  "appFirstThumbMs": 1744,
+  "appAllThumbsMs": 106334,
   "thumbErrors": 0,
   "errorCells": [],
   "scrollLongTasks": [
-    52
+    76,
+    50
   ],
   "slowKeyEvents": [
     {
       "name": "keydown",
-      "d": 32,
-      "p": 5.035000000032596
-    },
-    {
-      "name": "keyup",
-      "d": 32,
-      "p": 0.0849999999627471
-    },
-    {
-      "name": "keydown",
-      "d": 24,
-      "p": 3.425000000046566
-    },
-    {
-      "name": "keyup",
-      "d": 24,
-      "p": 0.025000000023283064
+      "d": 16,
+      "p": 4.6450000000186265
     },
     {
       "name": "keydown",
       "d": 16,
-      "p": 1.0150000000139698
+      "p": 1.2650000001303852
+    },
+    {
+      "name": "keyup",
+      "d": 16,
+      "p": 0.034999999683350325
+    },
+    {
+      "name": "keydown",
+      "d": 16,
+      "p": 3.0349999996833503
+    },
+    {
+      "name": "keydown",
+      "d": 24,
+      "p": 0.9050000002607703
     },
     {
       "name": "keyup",
@@ -47,102 +48,102 @@
     {
       "name": "keydown",
       "d": 16,
-      "p": 3.644999999902211
-    },
-    {
-      "name": "keydown",
-      "d": 16,
-      "p": 0.7149999999674037
+      "p": 0.43000000016763806
     },
     {
       "name": "keyup",
       "d": 16,
-      "p": 0.024999999906867743
+      "p": 0.02000000001862645
     },
     {
       "name": "keydown",
       "d": 16,
-      "p": 0.18500000005587935
+      "p": 0.7950000003911555
     }
   ],
   "loupeNextPreloadedMs": [
+    2,
+    2,
+    2,
     3,
     2,
-    4,
-    2,
-    3,
     3
   ],
   "loupeNextRapidMs": [
     2,
-    3,
-    186,
+    4,
+    227,
     46,
     3,
-    147
+    146
   ],
-  "zoom100Ms": 274,
+  "zoom100Ms": 249,
   "memory": {
-    "uaBytes": 74743959,
-    "jsHeap": 39695627,
+    "uaBytes": 74779814,
+    "jsHeap": 39391543,
     "isolated": true
   },
   "consoleErrors": [],
   "thumbStatsByFormat": {
-    "DNG": {
-      "n": 400,
-      "avgMs": 239,
-      "maxMs": 517
-    },
-    "CR3": {
-      "n": 400,
-      "avgMs": 96,
-      "maxMs": 534
-    },
-    "RAF": {
-      "n": 400,
-      "avgMs": 176,
-      "maxMs": 548
-    },
-    "CR2": {
-      "n": 200,
-      "avgMs": 192,
-      "maxMs": 543
+    "?": {
+      "n": 12,
+      "avgMs": 482,
+      "maxMs": 759
     },
     "SRW": {
       "n": 200,
-      "avgMs": 239,
-      "maxMs": 543
-    },
-    "NEF": {
-      "n": 400,
-      "avgMs": 120,
-      "maxMs": 467
-    },
-    "RW2": {
-      "n": 200,
-      "avgMs": 121,
-      "maxMs": 515
+      "avgMs": 249,
+      "maxMs": 544
     },
     "ARW": {
       "n": 400,
-      "avgMs": 131,
-      "maxMs": 462
+      "avgMs": 129,
+      "maxMs": 392
+    },
+    "CR2": {
+      "n": 199,
+      "avgMs": 182,
+      "maxMs": 302
+    },
+    "DNG": {
+      "n": 398,
+      "avgMs": 228,
+      "maxMs": 555
+    },
+    "RAF": {
+      "n": 398,
+      "avgMs": 177,
+      "maxMs": 357
+    },
+    "CR3": {
+      "n": 398,
+      "avgMs": 104,
+      "maxMs": 314
+    },
+    "NEF": {
+      "n": 398,
+      "avgMs": 116,
+      "maxMs": 382
+    },
+    "RW2": {
+      "n": 199,
+      "avgMs": 107,
+      "maxMs": 367
     },
     "ORF": {
-      "n": 200,
-      "avgMs": 154,
-      "maxMs": 337
+      "n": 199,
+      "avgMs": 165,
+      "maxMs": 478
     },
     "PEF": {
-      "n": 200,
-      "avgMs": 235,
-      "maxMs": 383
+      "n": 199,
+      "avgMs": 258,
+      "maxMs": 550
     },
     "JPEG": {
       "n": 20,
-      "avgMs": 105,
-      "maxMs": 127
+      "avgMs": 131,
+      "maxMs": 172
     }
   }
 }
