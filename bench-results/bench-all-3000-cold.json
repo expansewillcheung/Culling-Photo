@@ -1,0 +1,171 @@
+{
+  "count": 3000,
+  "mix": "all",
+  "cores": 4,
+  "tLibraryMs": 1489,
+  "tFirstScreenMs": 6192,
+  "tMetaAllMs": 15469,
+  "tAllThumbsMs": 305725,
+  "appFirstThumbMs": 1475,
+  "appAllThumbsMs": 304697,
+  "thumbErrors": 0,
+  "errorCells": [],
+  "scrollLongTasks": [
+    59,
+    67,
+    58,
+    62
+  ],
+  "slowKeyEvents": [
+    {
+      "name": "keydown",
+      "d": 16,
+      "p": 6.134999999776483
+    },
+    {
+      "name": "keydown",
+      "d": 24,
+      "p": 1.1049999999813735
+    },
+    {
+      "name": "keyup",
+      "d": 16,
+      "p": 0.0400000000372529
+    },
+    {
+      "name": "keydown",
+      "d": 16,
+      "p": 2.985000000335276
+    },
+    {
+      "name": "keyup",
+      "d": 16,
+      "p": 0.08999999985098839
+    },
+    {
+      "name": "keydown",
+      "d": 16,
+      "p": 0.6450000000186265
+    },
+    {
+      "name": "keyup",
+      "d": 16,
+      "p": 0.024999999906867743
+    }
+  ],
+  "loupeNextPreloadedMs": [
+    3,
+    4,
+    2,
+    7,
+    2,
+    3
+  ],
+  "loupeNextRapidMs": [
+    2,
+    6,
+    194,
+    41,
+    2,
+    56
+  ],
+  "zoom100Ms": 296,
+  "memory": {
+    "uaBytes": 1255468426,
+    "jsHeap": 38662527,
+    "isolated": true
+  },
+  "consoleErrors": [],
+  "thumbStatsByFormat": {
+    "?": {
+      "n": 10,
+      "avgMs": 417,
+      "maxMs": 711
+    },
+    "ARW": {
+      "n": 260,
+      "avgMs": 130,
+      "maxMs": 2044
+    },
+    "AVIF": {
+      "n": 130,
+      "avgMs": 327,
+      "maxMs": 2980
+    },
+    "SRW": {
+      "n": 130,
+      "avgMs": 275,
+      "maxMs": 2586
+    },
+    "DNG": {
+      "n": 260,
+      "avgMs": 224,
+      "maxMs": 558
+    },
+    "PEF": {
+      "n": 130,
+      "avgMs": 251,
+      "maxMs": 717
+    },
+    "JPEG": {
+      "n": 280,
+      "avgMs": 178,
+      "maxMs": 2446
+    },
+    "WEBP": {
+      "n": 130,
+      "avgMs": 389,
+      "maxMs": 1548
+    },
+    "CR2": {
+      "n": 130,
+      "avgMs": 184,
+      "maxMs": 301
+    },
+    "CR3": {
+      "n": 260,
+      "avgMs": 108,
+      "maxMs": 2708
+    },
+    "RAF": {
+      "n": 260,
+      "avgMs": 170,
+      "maxMs": 298
+    },
+    "NEF": {
+      "n": 260,
+      "avgMs": 159,
+      "maxMs": 3071
+    },
+    "ORF": {
+      "n": 130,
+      "avgMs": 149,
+      "maxMs": 354
+    },
+    "RW2": {
+      "n": 130,
+      "avgMs": 100,
+      "maxMs": 418
+    },
+    "HEIC": {
+      "n": 130,
+      "avgMs": 1508,
+      "maxMs": 2482
+    },
+    "TIFF": {
+      "n": 130,
+      "avgMs": 244,
+      "maxMs": 487
+    },
+    "PNG": {
+      "n": 130,
+      "avgMs": 286,
+      "maxMs": 3440
+    },
+    "JXL": {
+      "n": 130,
+      "avgMs": 1982,
+      "maxMs": 3451
+    }
+  }
+}
